@@ -3,13 +3,16 @@
 % Author: Miguel Dias
 % Date 10/08/16
 % v4.0
+
 % Description: Final transition network. Updated initial transition
 % according to John's email. Changes in line 32 and 139-143.
 % 1) Generate table with all possible nodes up to defined time step T
 % 2) Append the start and end states to the table
 % dt=15s, T=59 time steps (same as John in the example)
+
 % in order to capture full start-up/shutdown procedure
 % Include 2 input transitions: can chage s and v in the same step!
+
 % STRUCTURE DEFINITIONS:
 % Node=(Name,t,s,v,RT)
 % t-timestep; RT - remaining time
@@ -32,30 +35,32 @@ dt = 15; %in s
 T = end_time * 60 / dt; %number of time steps
 %T=59;
 smin = 1; %minimum 'on' speed level
-smax = 9; %maximum speed level
+smax = 25; %maximum speed level
 vmin = 0; %minimum bypass valve level (corresponds 0%)
-vmax = 4; %maximum bypass valve level (corresponds to 80%)
+vmax = 9; %maximum bypass valve level (corresponds to 90%)
 
-nnodes = smax * (vmax + 1); %number of possible nodes per time step, without off state
+nnodes = (smax - smin + 1) * (vmax - vmin + 1); %number of possible nodes per time step, without off state
 total_nodes = nnodes + 1;
-T_startup = 120 + 8 * 2 * dt; %in s
-T_shutdown = 180; %in s
+T_startup = 120 + 8 * 2 * dt; %in s (why?)
+T_shutdown = 180; %in s (why?)
 varnames = {'Name', 't', 's', 'v'};
 
 %generate initial and start nodes
 Nodes = table({'Start'; 'End'}, [NaN; NaN], [NaN; NaN], [NaN; NaN], 'VariableNames', varnames);
-Nodes.RT = [NaN; NaN];
+Nodes.RT = [NaN; NaN]; % extra column added to the table
 
 %% Generate 'base' table with all the possible states, for a timestep
-svvals = combvec(smin:smax, vmin:vmax)';
-names = repmat({'name'}, nnodes, 1);
+svvals = combvec(smin:smax, vmin:vmax)'; % column vectors with two rows-first row for speeds (1-9)
+%and second row for the valve position
+names = repmat({'name'}, nnodes, 1); % a column vector 'name'
 basic_table = table(names, ones(nnodes, 1), svvals(:, 1), svvals(:, 2), 'VariableNames', varnames);
 
 %append off state before defining RT and Flags
 off = table({'1x'}, 1, 0, 0, 'VariableNames', varnames);
 basic_table = [off; basic_table]; %basic table, with off state and all possible combinations
 
-aux_table = repmat(basic_table, T, 1); %all possible nodes, for all timesteps
+aux_table = repmat(basic_table, T, 1); %all possible nodes, for all timesteps repetetion of basic_table for
+% total time T
 
 %% Define the time step for all nodes
 ts = 1;
@@ -94,7 +99,7 @@ toc
 
 % Transitions from start: any of the 46 possible states
 Transition.state_t = repmat({'Start'}, (nnodes + 1), 1);
-Transition.state_t1 = node_table.Name(3:(nnodes + 3));
+Transition.state_t1 = node_table.Name(3:(nnodes + 3)); %%% why does 3 come here?
 Transition.cost = zeros(nnodes+1, 1);
 
 Transition_t = struct2table(Transition);
@@ -136,6 +141,18 @@ parfor jj = 3:size(node_table, 1) % start and end nodes are treated separately
       new_transition = table(current_node.Name, next_name, Inf, 'VariableNames', t_varnames);
       Transition_t = [Transition_t; new_transition];
     end
+    %decrease speed and increase bypass (RT>=1, s>smin, v<vmax, state=on)
+    if (current_node.s > smin && isoff == 0 && current_node.v < vmax)
+      next_name = {['t', num2str(current_node.t+1), 'S', num2str(current_node.s-1), 'V', num2str(current_node.v+1)]};
+      new_transition = table(current_node.Name, next_name, Inf, 'VariableNames', t_varnames);
+      Transition_t = [Transition_t; new_transition];
+    end
+    %decrease speed and decrease bypass (RT>=1, s>smin, v>vmin)
+    if (current_node.s > smin && current_node.v > vmin)
+      next_name = {['t', num2str(current_node.t+1), 'S', num2str(current_node.s-1), 'V', num2str(current_node.v-1)]};
+      new_transition = table(current_node.Name, next_name, Inf, 'VariableNames', t_varnames);
+      Transition_t = [Transition_t; new_transition];
+    end
   else % if RT=0, then connect to end state
     next_name = {'End'};
     end_transition = table(current_node.Name, next_name, 0, 'VariableNames', t_varnames);
@@ -168,12 +185,6 @@ parfor jj = 3:size(node_table, 1) % start and end nodes are treated separately
       new_transition = table(current_node.Name, next_name, Inf, 'VariableNames', t_varnames);
       Transition_t = [Transition_t; new_transition];
     end
-  end
-  %decrease speed (by 1) and increase bypass by 1 or 2 (RT>=2, s<smax, v>vmin)
-  if (current_node.RT >= 1 && current_node.s > smin && isoff == 0 && current_node.v < vmax) %condition to increase bypass 1 unit
-    next_name = {['t', num2str(current_node.t+1), 'S', num2str(current_node.s-1), 'V', num2str(current_node.v+1)]};
-    new_transition = table(current_node.Name, next_name, Inf, 'VariableNames', t_varnames);
-    Transition_t = [Transition_t; new_transition];
   end
   %startup procedure
   if (isoff == 1 && current_node.RT >= T_startup / dt)

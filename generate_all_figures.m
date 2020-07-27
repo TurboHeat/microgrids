@@ -22,6 +22,8 @@ t_plot = (1:n_lines * end_time)' ./ n_lines;
 savepath = 'C:\Users\migueld\Dropbox\Technion Grand Energy Program\Miguel Dias\Data\Case_Study_Images\';
 save_fig = 1;
 
+N = 2; % number of MGT
+
 %%
 joule2kWh = 1 / 3.6e6; %1kWh=3.6e6J
 fuel_index = [1 * ones(12, 1); 2 * ones(12, 1); 3 * ones(12, 1)];
@@ -72,13 +74,62 @@ for i = 1:numel(fuel_index)
   ylabel('Rate ($/kWh)');
   title('Applicable electric rate');
   
-  g = digraph(state_from, state_to, decided_costs(:, i));
-  [path, path_length] = shortestpath(g, 'Start', 'End', 'Method', 'acyclic');
-  [power_MGT(:, i), heat_MGT(:, i), mdot_MGT(:, i)] = extract_path(path, power_map, heat_map, fuel_map, SV_states);
-  path_cost(:, i) = path_length;
+  %% Multiturbine case : Anoop
+  
+  %      lambda_P = zeros(length(to_state_map),1); %initialize
+  %      lambda_H = zeros(length(to_state_map),1); %initialize
+  
+  %      lambda_P = zeros(length(to_state_map),numel(BUILDING)*numel(DAY)*numel(price_kg_f)); %initialize
+  %      lambda_H = zeros(length(to_state_map),numel(BUILDING)*numel(DAY)*numel(price_kg_f)); %initialize
+  
+  lambda_p = zeros(T, 1);
+  lambda_h = zeros(T, 1);
+  
+  gamma = 0.01;
+  limit = 10;
+  
+  for iter = 1:limit
+    
+    %caluclate subgradient
+    
+    %   subgradient_P = av_P_produced - av_P_demand;
+    %   subgradient_H = av_H_produced - av_H_demand;
+    
+    %decided_costs(:,i) = decided_costs(:,i) + lambda_P + lambda_H;
+    
+    g = digraph(state_from, state_to, decided_costs(:, i));
+    [path, path_length] = shortestpath(g, 'Start', 'End', 'Method', 'acyclic');
+    [power_MGT(:, i), heat_MGT(:, i), mdot_MGT(:, i)] = extract_path(path, power_map, heat_map, fuel_map, SV_states);
+    path_cost(:, i) = path_length;
+    
+    %  subgradient_P = power_demand - sum(power_MGT);
+    %  subgradient_H = heat_demand - sum(heat_MGT);
+    %
+    %
+    %  lambda_P = lambda_P + gamma.*subgradient_P;
+    %  lambda_H = lambda_H + gamma.*subgradient_H;
+    
+    %total_power_MGT = N*power_MGT(:,i);
+    %total_heat_MGT = N*heat_MGT(:,i);
+    
+    
+    %Compute subgradients
+    lambda_p = power_demand(:, d_index) - N * power_MGT(:, i);
+    lambda_h = heat_demand(:, d_index) - N * power_MGT(:, i);
+    lambda = lambda + gamma * [lambda_p, lambda_h];
+    
+    
+  end
+  
+  %g=digraph(state_from, state_to, decided_costs(:,i));
+  %[path ,path_length] = shortestpath(g,'Start','End','Method','acyclic');
+  %[power_MGT(:,i), heat_MGT(:,i), mdot_MGT(:,i)] = extract_path(path, power_map, heat_map,fuel_map,SV_states);
+  %path_cost(:,i)=path_length;
+  
+  %%
   
   h1 = figure(3);
-  plot(t_plot, power_demand(:, d_index)/1e3, t_plot, power_MGT(:, i)/1e3, t_plot, (power_demand(:, d_index) - power_MGT(:, i))/1e3, 'LineWidth', 2); %in kW
+  plot(t_plot, power_demand(:, d_index)/1e3, t_plot, N*power_MGT(:, i)/1e3, t_plot, (power_demand(:, d_index) - N * power_MGT(:, i))/1e3, 'LineWidth', 2); %in kW
   set(gca, 'fontsize', 14)
   %legend('Power demand','CHP commitement', 'Utility commitement');
   xlim([0, 25]);
@@ -89,7 +140,7 @@ for i = 1:numel(fuel_index)
   hold off;
   
   h2 = figure(4);
-  plot(t_plot, heat_demand(:, d_index)/1e3, t_plot, heat_MGT(:, i)/1e3, t_plot, (heat_demand(:, d_index) - heat_MGT(:, i))/1e3, 'LineWidth', 2); %in Kw
+  plot(t_plot, heat_demand(:, d_index)/1e3, t_plot, N*heat_MGT(:, i)/1e3, t_plot, (heat_demand(:, d_index) - N * heat_MGT(:, i))/1e3, 'LineWidth', 2); %in Kw
   set(gca, 'fontsize', 14)
   %legend('Heat demand','CHP commitement', 'Utility commitement');
   xlim([0, 25]);

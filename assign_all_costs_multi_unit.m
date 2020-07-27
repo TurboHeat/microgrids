@@ -1,7 +1,7 @@
 %--------------------------------------------------------------%
-% File: assign_all_costs.m (script)
-% Author: Miguel Dias
-% Date 14/08/16
+% File: assign_all_costs_multi_unit.m (script)
+% Author: Miel Sharf
+% Date 12/5/2020
 % v1.0
 % Description: Run all combinations of days and building to check if the
 % tariffs are beeing correcty applied to all days of operations.
@@ -14,7 +14,7 @@
 clearvars;
 close all;
 clc;
-addpath(genpath('C:\Users\migueld\Dropbox\Technion Grand Energy Program\Miguel Dias\Data'));
+addpath(genpath('C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data'));
 
 %%
 show_plot = 0; %boolean to decide if the plots off tariffs and demands are shown
@@ -34,9 +34,13 @@ coststring = {'C1', 'C2', 'C3'}; %{C1, C2 C3}=[7.74 8.85 6.80] $/1000ft^3
 %% Define save folder
 cname = getenv('computername');
 if strcmp(cname, 'AEJETLAB38') %at uni
-  savepath = 'C:\Users\migueld\Dropbox\Technion Grand Energy Program\Miguel Dias\Data\';
+  %     savepath='C:\Users\migueld\Dropbox\Technion Grand Energy Program\Miguel Dias\Data\';
+  %     savepath='C:\Anoop\Anoop_Technion\Research Work\MOE Project\Anoop Jain\Data\';
+  savepath = 'C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data\';
 else %my PC
-  savepath = 'C:\Users\migue\Dropbox\Technion Grand Energy Program\Miguel Dias\Data\';
+  %     savepath='C:\Users\migue\Dropbox\Technion Grand Energy Program\Miguel Dias\Data\';
+  %     savepath='C:\Anoop\Anoop_Technion\Research Work\MOE Project\Anoop Jain\Data\';
+  savepath = 'C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data\';
 end
 
 %% get all tariffs combinations
@@ -132,20 +136,19 @@ sol_select = [~SV_states(from_state_map, 1) & ~SV_states(to_state_map, 1), ... %
   ~SV_states(to_state_map, 1), ... % Shut down
   true(numel(n_tsteps), 1)];% Remaining transitions
 [~, sol_select] = max(sol_select, [], 2);
-% assigns a small penalty to every input (s,v) change
-transition_penalty = [zeros(total_nodes, 1); ...
+% checks whether an edge corresponds to a change of (s,v). Such transitions
+% will be penalized later in assign_costs_multi_unit_fcn().
+is_transition = [zeros(total_nodes, 1); ...
   ~[SV_states(from_state_map(total_nodes+1:end-total_nodes), 1) ==, SV_states(to_state_map(total_nodes+1:end-total_nodes), 1) & ... %checks equality of S values
   SV_states(from_state_map(total_nodes+1:end-total_nodes), 2) ==, SV_states(to_state_map(total_nodes+1:end-total_nodes), 2)]; ...
   zeros(total_nodes, 1)];%checks equality of V values
 %% Main loop to assign edges
-lambda = zeros(T, 2);
-%call lambda
 k = 1;
 decided_costs = zeros(length(to_state_map), numel(BUILDING)*numel(DAY)*numel(price_kg_f));
 for cost = 1:numel(price_kg_f)
   fuel_price = price_kg_f(cost);
   for i = 1:numel(BUILDING) * numel(DAY)
-    decided_costs(:, k) = assign_costs_fcn(double(dt), power_map, heat_map, fuel_map, mdot_fuel_SU, total_nodes, sol_select, time_from, n_tsteps, from_state_map, to_state_map, power_demand(:, i), heat_demand(:, i), elec_tariff(:, i), heat_tariff(cost), fuel_price, transition_penalty);
+    decided_costs(:, k) = assign_costs_multi_unit_fcn(double(dt), fuel_map, mdot_fuel_SU, total_nodes, sol_select, n_tsteps, from_state_map, to_state_map, fuel_price, is_transition);
     k = k + 1;
   end
 end

@@ -59,7 +59,7 @@ switch building_type
     %Intermediate 7am-12am && 8pm-11pm
     if day == 3 %summer
       peak_h = n_lines .* [12, 20]; %start and end indices of peak hours
-      off_peak_h = [1, n_lines * 7, n_lines * 23, n_lines * 24]; % one is the start index, midnight
+      off_peak_h = [1, n_lines * 7, n_lines * 23 + 1, n_lines * 24]; % one is the start index, midnight
       off_peak_charge = 0.0273; %$/kWh
       peak_charge = 0.0444; %$/kWh
       intermediate_charge = 0.0412; %$/kWh
@@ -82,7 +82,7 @@ switch building_type
     %Intermediate 7am-12am && 8pm-11pm
     if day == 3 %summer
       peak_h = n_lines .* [12, 20]; %start and end indices of peak hours
-      off_peak_h = [1, n_lines * 7, n_lines * 23, n_lines * 24]; % one is the start index, midnight
+      off_peak_h = [1, n_lines * 7, n_lines * 23 + 1, n_lines * 24]; % one is the start index, midnight
       off_peak_charge = 0.0273; %$/kWh
       peak_charge = 0.0444; %$/kWh
       intermediate_charge = 0.0412; %$/kWh
