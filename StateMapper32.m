@@ -2,13 +2,14 @@ classdef StateMapper32 < handle
 % This class facilitates working with graphs that contain states representable by 32-bit numbers.
 
 properties (Access = private, Constant = true)
+  NBITS = int8(32);
   UINT_CLASS = 'uint32';
   UINT_CLASS_FUNC = @uint32;
 end
 
 properties (GetAccess = public, SetAccess = immutable)
-  configBits   (1,1) int32
-  timestepBits (1,1) int32
+  configBits   (1,1) int8
+  timestepBits (1,1) int8
 end
 
 properties (GetAccess = private, SetAccess = immutable)
@@ -20,29 +21,30 @@ end
 methods
   function sm = StateMapper32(configBits, timestepBits)
     arguments
-      configBits   (1,1) int32 = 8;  % up-to 256 configurations
-      timestepBits (1,1) int32 = 13; % up-to 8192 steps
+      configBits   (1,1) int8 = 8;  % up-to 256 configurations
+      timestepBits (1,1) int8 = 13; % up-to 8192 steps
     end
     % Input testing:
-    spareBits = 32 - (2*configBits + timestepBits);
+    spareBits = sm.NBITS - (2*configBits + timestepBits);
     assert( spareBits >= 0, 'StateMapper32:tooManyBits', ...
-      'The specified number of states cannot fit into 32 bits!');
+      'The specified number of states cannot fit into %d bits!', sm.NBITS);
     % Store settings:
     sm.configBits = configBits;
     sm.timestepBits = timestepBits;
     % Compute masks:
-    sm.bitmaskStateTo = 2^(32-spareBits-timestepBits)-1; % dec2bin(sm.bitmaskStateTo,32)
-    sm.bitmaskStateFrom = 2^(32-spareBits-timestepBits-configBits)-1; % dec2bin(sm.bitmaskStateFrom,32)
+    sm.bitmaskStateTo   = 2^sm.UINT_CLASS_FUNC(sm.NBITS-spareBits-timestepBits)           -1; % dec2bin(sm.bitmaskStateTo,  sm.NBITS)
+    sm.bitmaskStateFrom = 2^sm.UINT_CLASS_FUNC(sm.NBITS-spareBits-timestepBits-configBits)-1; % dec2bin(sm.bitmaskStateFrom,sm.NBITS)
   end
 end
 
 methods (Access = public)
   function uintState = toUint(sm, stateFrom, stateTo, timeStamp)
     %% Input tests:
-    assert(all(stateFrom <= 2^sm.configBits) && all(stateTo <= 2^sm.configBits), ...
+    assert(all(stateFrom <= p2(sm.configBits)) ...
+        && all( stateTo  <= p2(sm.configBits)),...
       'toUint:inputStateOverflow', ...
       'One or more states IDs cannot be represented by the available number of bits.');
-    assert(all(timeStamp <= 2^sm.timestepBits),'toUint:inputTimestepOverflow',...
+    assert(all(timeStamp <= p2(sm.timestepBits)),'toUint:inputTimestepOverflow',...
       'One or more timestamps cannot be represented by the available number of bits.');
     assert(isequal(numel(stateFrom), numel(stateTo), numel(timeStamp)), ...
       'toUint:differentInputLengths',...
@@ -55,9 +57,9 @@ methods (Access = public)
     % The business logic of toUint(). Can be invoked directly (should be slightly faster)  
     % but has the risk of producing nonsense.      
     uintState = ...
-                StateMapper32.UINT_CLASS_FUNC(stateFrom)                   + ...
-      bitshift( StateMapper32.UINT_CLASS_FUNC( stateTo ),   sm.configBits) + ...
-      bitshift( StateMapper32.UINT_CLASS_FUNC(timeStamp), 2*sm.configBits);  
+                sm.UINT_CLASS_FUNC(stateFrom)                   + ...
+      bitshift( sm.UINT_CLASS_FUNC( stateTo ),   sm.configBits) + ...
+      bitshift( sm.UINT_CLASS_FUNC(timeStamp), 2*sm.configBits);  
   end
   
   function [stateFrom, stateTo, timeStamp] = fromUint(sm, uintState)
@@ -65,10 +67,14 @@ methods (Access = public)
       sm (1,1) StateMapper32
       uintState (:,:) uint32 % dec2bin(uintState,32)
     end
-    timeStamp = bitshift( bitand( sm.bitmaskTimestep,  uintState, StateMapper32.UINT_CLASS), -2*sm.configBits);
-    stateTo   = bitshift( bitand( sm.bitmaskStateTo,   uintState, StateMapper32.UINT_CLASS), -1*sm.configBits);
-    stateFrom = bitshift( bitand( sm.bitmaskStateFrom, uintState, StateMapper32.UINT_CLASS), -0*sm.configBits);
+    timeStamp = bitshift( bitand( sm.bitmaskTimestep,  uintState, sm.UINT_CLASS), -2*sm.configBits);
+    stateTo   = bitshift( bitand( sm.bitmaskStateTo,   uintState, sm.UINT_CLASS), -1*sm.configBits);
+    stateFrom = bitshift( bitand( sm.bitmaskStateFrom, uintState, sm.UINT_CLASS), -0*sm.configBits);
   end
 end
 
+end
+
+function out = p2(in)
+  out = bitshift(1, in, StateMapper32.UINT_CLASS);
 end
