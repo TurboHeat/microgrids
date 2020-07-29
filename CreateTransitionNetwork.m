@@ -1,106 +1,85 @@
+function CreateTransitionNetwork(kwargs)
 %--------------------------------------------------------------%
-% File: CreateTransitionNetwork.m (script)
-% Author: Miguel Dias
-% Date 10/08/16
-% v4.0
-
-% Description: Final transition network. Updated initial transition
-% according to John's email. Changes in line 32 and 139-143.
-% 1) Generate table with all possible nodes up to defined time step T
-% 2) Append the start and end states to the table
-% dt=15s, T=59 time steps (same as John in the example)
-
-% in order to capture full start-up/shutdown procedure
-% Include 2 input transitions: can chage s and v in the same step!
-
-% STRUCTURE DEFINITIONS:
-% Node=(Name,t,s,v,RT)
-% t-timestep; RT - remaining time
-% Transition=(state_t, state_t1, cost)
-% Includes loop parallelization in the main for loop.
-% Does not need any external files.
-% Timing stats:
-%Elapsed time is 1351.708937 seconds. -> construction of the node table
-%Starting parallel pool (parpool) using the 'local' profile ... connected to 4 workers.
-%Elapsed time is 8612.214804 seconds. -> construction of edges
+% TODO
 %--------------------------------------------------------------%
-clearvars;
-close all;
-clc;
-savepath = 'C:\Users\migueld\Dropbox\Technion Grand Energy Program\Miguel Dias\Data\';
+
+%% Handle inputs:
+arguments % accepted key-value pairs:
+  kwargs.smin (1,1) uint8 = 1;  % minimum 'on' speed level
+  kwargs.smax (1,1) uint8 = 25; % maximum speed level
+  kwargs.vmin (1,1) uint8 = 0;  % minimum bypass valve level (corresponds to 0% )
+  kwargs.vmax (1,1) uint8 = 9;  % maximum bypass valve level (corresponds to 90%)
+  kwargs.dt   (1,1) double = 15; % duration of a step [s]
+  kwargs.endTime (1,1) uint16 = 24*60; % final time [min]. Default: 24 [h/day] * 60 [min/h]  
+  kwargs.savePath (1,1) string = fullfile(fileparts(mfilename), "Data");
+end
 
 tic
-end_time = 24 * 60; %end time in minutes
-dt = 15; %in s
-T = end_time * 60 / dt; %number of time steps
-%T=59;
-smin = 1; %minimum 'on' speed level
-smax = 25; %maximum speed level
-vmin = 0; %minimum bypass valve level (corresponds 0%)
-vmax = 9; %maximum bypass valve level (corresponds to 90%)
+% Unpack inputs:
+smin = kwargs.smin;
+smax = kwargs.smax;
+vmin = kwargs.vmin;
+vmax = kwargs.vmax;
+dt = kwargs.dt;
+endTime = kwargs.endTime;
+savePath = kwargs.savePath;
 
-nnodes = (smax - smin + 1) * (vmax - vmin + 1); %number of possible nodes per time step, without off state
-total_nodes = nnodes + 1;
-T_startup = 120 + 8 * 2 * dt; %in s (why?)
-T_shutdown = 180; %in s (why?)
-varnames = {'Name', 't', 's', 'v'};
+%% Constants:
+SECONDS_PER_MINUTE = 60;
 
-%generate initial and start nodes
-Nodes = table({'Start'; 'End'}, [NaN; NaN], [NaN; NaN], [NaN; NaN], 'VariableNames', varnames);
-Nodes.RT = [NaN; NaN]; % extra column added to the table
+%% Preliminary computations:
+tStartup = 120/dt + 8 * 2; % [timesteps]
+tShutdown = 180/dt; % [timesteps]
+stepsPerMinute = SECONDS_PER_MINUTE / dt;
+nt = single(endTime * stepsPerMinute); % number of time steps
+ns = (smax - smin + 1);
+nv = (vmax - vmin + 1);
+nWorkingStates = ns * nv; % number of possible nodes per time step, excluding the 'off' state
+nStates = single(nWorkingStates + 1);
+sm = StateMapper32( ceil(log2(nStates)), ceil(log2(nt)) );
 
-%% Generate 'base' table with all the possible states, for a timestep
-svvals = combvec(smin:smax, vmin:vmax)'; % column vectors with two rows-first row for speeds (1-9)
-%and second row for the valve position
-names = repmat({'name'}, nnodes, 1); % a column vector 'name'
-basic_table = table(names, ones(nnodes, 1), svvals(:, 1), svvals(:, 2), 'VariableNames', varnames);
+%% Generate all states at all times:
+[SS,VV] = ndgrid(uint16(smin:smax), uint16(vmin:vmax));
+svToStateNumber = [0,0; [SS(:), VV(:)]]; % this will be used in the uint32 mapping
 
-%append off state before defining RT and Flags
-off = table({'1x'}, 1, 0, 0, 'VariableNames', varnames);
-basic_table = [off; basic_table]; %basic table, with off state and all possible combinations
-
-aux_table = repmat(basic_table, T, 1); %all possible nodes, for all timesteps repetetion of basic_table for
-% total time T
-
-%% Define the time step for all nodes
-ts = 1;
-for ii = 1:(nnodes + 1):size(aux_table, 1)
-  aux_table.t(ii:size(aux_table, 1)) = ts;
-  ts = ts + 1;
-end
-
-%% Name all the nodes eg: t1S1V0 -time 1, speed 1, valve postition 0
-for jj = 1:size(aux_table, 1)
-  aux_table.Name(jj) = {['t', num2str(aux_table.t(jj)), 'S', num2str(aux_table.s(jj)), 'V', num2str(aux_table.v(jj))]};
-  if aux_table.s(jj) == 0 && aux_table.v(jj) == 0
-    aux_table.Name(jj) = {[num2str(aux_table.t(jj)), 'x']};
-  end
-end
-
-%define RT  for all nodes
-aux_table.RT = T - aux_table.t;
-
-%append start and end nodes - final node table
-node_table = [Nodes; aux_table]; %final node table
+[SS,TT] = ndgrid(1:nStates, 1:nt);
+tSr = [zeros(1,3,'uint16');                 % Special row indicating "start"
+       intmax('uint16')*ones(1,3,'uint16'); % Special row indicating "finish"
+       [TT(:), SS(:), nt-TT(:)]]; % formerly, "aux_table"
 toc
+error('WORK IN PROGRESS!');
 
-%% Create Transition table, from nodes
+%% Create transitions matrix
+% Preallocation:
+nNodes = size(tSr, 1); %#ok<UNRCH>
+ubTransitionsPerTimestep = nWorkingStates * 11; % Need to replace 11 with a f(ns,nv,...)
+connectivity = spalloc(nNodes, nNodes, ubTransitionsPerTimestep);
 
-% Allowable transitions:
-% increase s, RT>=2 (RT=Remaining Time = T-current time step)
-% decrease s, RT>=1
-% increase v, RT>=1
-% decrease v, RT>=1
-% Startup, s=v=0 , RT>=T_startup
-% Shutdown, s=1, v=0, RT>=T_shutdown
+%{
+Allowed transitions:
+•	(s,v) -> (s,v) - keep same state, advances time by 1.
+•	(s,v) -> (s,v+1) - increase bypass valve position by 1, advances time by 1. Available only if v<=v_max - 1.
+•	(s,v) -> (s,v-1) - decrease bypass valve position by 1, advances time by 1. Available only if v>=v_min + 1.
+•	(s,v) -> (s+1,v) - increase engine velocity by 1, advance time by 2. Available only if s<=s_max - 1.
+•	(s,v) -> (s-1,v) - decrease engine velocity by 1, advance time by 1. Available only if s >= s_min + 1.
+•	(s,v) -> (s+1,v+1) - increase engine velocity by 1 and bypass position by 1, advance time by 2. Available only if s<=s_max - 1 and v<=v_max - 1.
+•	(s,v) -> (s+1,v+2) - increase engine velocity by 1 and bypass position by 2, advance time by 2. Available only if s<=s_max - 1 and v<=v_max - 2.
+•	(s,v) -> (s+1,v-1) - increase engine velocity by 1 and decrease bypass position by 1, advance time by 2. Available only if s<=s_max - 1 and v>= v_min - 1.
+•	(s,v) -> (s+1,v-2) - increase engine velocity by 1 and decrease bypass position by 2, advance time by 2. Available only if s<=s_max - 1 and v>= v_min - 2.
+•	(s,v) -> (s-1,v+1) - decrease engine velocity by 1 and increase bypass position by 1, advance time by 1. Available only if s>=s_min- 1 and v<=v_max - 1.
+•	(s,v) -> (s-1,v-1) - decrease engine velocity by 1 and bypass position by 1, advance time by 1. Available only if s>=s_min- 1 and v>=v_min+1.
+•	off -> (s_max,v) - start up, advance time by T_startup. The bypass valve position can be anything between v_min and v_max.
+•	(s_min,v_min) -> off - shutdown, advance time by T_shutdown.
+%}
 
 % Transition table info:
 % State @ t (state_t); State @ t+1 (state_t1);  Remaining time (RT)
 
 % Transitions from start: any of the 46 possible states
-Transition.state_t = repmat({'Start'}, (nnodes + 1), 1);
-Transition.state_t1 = node_table.Name(3:(nnodes + 3)); %%% why does 3 come here?
-Transition.cost = zeros(nnodes+1, 1);
+node_table = table(); % TEMPORARY, to avoid a "compilation-time" error.
+Transition.state_t = repmat({'Start'}, (nWorkingStates + 1), 1);
+Transition.state_t1 = node_table.Name(3:(nWorkingStates + 3)); %%% why does 3 come here?
+Transition.cost = zeros(nWorkingStates+1, 1);
 
 Transition_t = struct2table(Transition);
 
@@ -212,6 +191,6 @@ g = digraph(Transition_t.state_t, Transition_t.state_t1, Transition_t.cost);
 % labelnode(h, [{'Start'}, {'End'}], {'Start', 'End'})
 
 %%
-savename = ['graph', num2str(end_time/60), 'h.mat'];
-save([savepath, savename], 'g', 'node_table', 'Transition_t', 'total_nodes');
-save([savepath, 'workspace', '_', savename]);
+savename = ['graph', num2str(endTime/60), 'h.mat'];
+save([savePath, savename], 'g', 'node_table', 'Transition_t', 'total_nodes');
+save([savePath, 'workspace', '_', savename]);
