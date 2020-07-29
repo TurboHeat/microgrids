@@ -9,9 +9,12 @@ end
 properties (GetAccess = public, SetAccess = immutable)
   configBits   (1,1) int32
   timestepBits (1,1) int32
+end
+
+properties (GetAccess = private, SetAccess = immutable)
   bitmaskStateFrom (1,1) uint32
   bitmaskStateTo   (1,1) uint32
-  bitmaskTimestep  (1,1) uint32 = intmax('uint32');
+  bitmaskTimestep  (1,1) uint32 = intmax('uint32');  
 end
 
 methods
