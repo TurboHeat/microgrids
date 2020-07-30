@@ -4,6 +4,7 @@
 %%% of the state (engine speed), the second column defines the v-variable
 %%% of the state (bypass valve), and the third number describes the key,
 %%% which is a uint32. The (0,0) state corresponds to 'off'.
+%%% If Dictionary only has 2 columns, add a third one as 1:States.
 %%%
 %%% T_Startup: Amount of time it takes to complete a startup.
 %%%
@@ -15,7 +16,7 @@
 %%% if and only if the transition from the state with key i to the state
 %%% with key j is valid and takes t units of time.
 
-function [Adj] = BuildStateAdjacencyMatrix(Dictionary,T_Startup,T_Shutdown)
+function [Adj] = BuildStateAdjacencyMatrix(Dictionary_uint16,T_Startup,T_Shutdown)
 %%% Main idea - first build an adjacency matrix with lexicographic order,
 %%% then use the dictionary to perform a "permutation" giving the desired
 %%% adjacency matrix.
@@ -24,6 +25,12 @@ function [Adj] = BuildStateAdjacencyMatrix(Dictionary,T_Startup,T_Shutdown)
 %%% s_1=s_2 and v_1 < v_2. In that case, if there are S total speeds
 %%% (1,2,...,S) and V total bypass valve positions (0,1,...,V-1), then the
 %%% state (s,v) is in the k-th position where k = V*(s-1)+v+1.
+
+Dictionary = double(Dictionary_uint16);
+%If Dictionary only has 2 columns - Add a key column 1:States.
+if (size(Dictionary,2) == 2)
+    Dictionary(:,3) = (1:size(Dictionary,1))';
+end
 
 S = max(Dictionary(:,1));
 V = max(Dictionary(:,2)) + 1;
@@ -57,7 +64,7 @@ StartUp = @(j) (j >= V*(S-1)+1); %Startup to max engine speed.
 ShutDown = @(j) (j == 1); %Shutdown only from (s=1,v=0) state.
 
 num_states = S*V + 1;
-Adj = zeros(num_states,num_states, max([T_Startup,T_Shutdown,2]));
+Adj = uint16(zeros(num_states,num_states, max([T_Startup,T_Shutdown,2])));
 
 % Transitions of Length 1
 Adj(:,:,1) = Adj(:,:,1) + LexOrderLawAdjMatrix_NoOffState(S,V,StayTheSame);
@@ -106,16 +113,16 @@ end
 %%% only to `on' states and not to the `off' states.
 function AdjLaw = LexOrderLawAdjMatrix_NoOffState(S,V,Law)
 %Enumerates all possible states.
-num_states = S*V;
+num_states = double(S*V);
 %IndexPairArray stores inside the index of all pairs (i,j) where
 %i,j=1,2,...,S*V are on states.
 IndexPairArray = (1:num_states^2)';
-AdjPartial = zeros(num_states);
+AdjPartial = uint16(zeros(num_states));
 % Matlab matrices can be called as arrays, which gives them columnwise
 % (i.e., if A is a m x m matrix then A(2) is the 2,1 entry). Thus
 % AdjPartial(k) corresponds to the pair of states (i,j) such that k =
 % num_states*(j-1)+i (as k,i,j start from 1). Thus, we get A(k) = Law(i,j).
-AdjPartial(:) = Law(mod(IndexPairArray-1,num_states)+1,floor((IndexPairArray-1)./num_states)+1);
+AdjPartial(:) = uint16(Law(mod(IndexPairArray-1,num_states)+1,floor((IndexPairArray-1)./num_states)+1));
 
 % Add the zero-state in the adjacency matrix... - it is added in the end.
 AdjLaw = [AdjPartial,zeros(num_states,1);zeros(1,num_states+1)];
@@ -133,16 +140,16 @@ num_states = S*V;
 IndexPairArray = (1:num_states)';
 % For each on state, check if the transitions between it and the off state
 % is valid or not.
-AdjPartial = Law(IndexPairArray);
+AdjPartial = uint16(Law(IndexPairArray));
 %Add zeros to makes this a proper adjacency matrix.
 %In both cases, we put a zero in the last position at the final row even 
 %though we can %move from the off state to itself. We do this as this 
 %function will be called to specify the transitios which take T_shutdown 
 %or T_startup time units.
 if(IsTo) %To
-    AdjLaw = [zeros(num_states),AdjPartial ; zeros(1,num_states+1)];
+    AdjLaw = uint16([zeros(num_states),AdjPartial ; zeros(1,num_states+1)]);
     return;
 end
 %Else - From 
-    AdjLaw = [zeros(num_states,num_states+1);AdjPartial',0];
+    AdjLaw = uint16([zeros(num_states,num_states+1);AdjPartial',0]);
 end
