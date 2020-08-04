@@ -50,15 +50,18 @@ intmax('uint16') * ones(1, 3, 'uint16')];% Special row indicating "finish"
 %}
 
 %% Create adjacency (transitions) matrix
+% Build transitions from a single time step
 B = BuildStateAdjacencyMatrix(svToStateNumber, tStartup, tShutdown); 
 % figure(); spy(reshape(B, nStates, []));
 
+% Replicate allowed transitions for all time steps (https://stackoverflow.com/q/63171491/)
 % Compute the indices:
 [x, y] = find(reshape(B, nStates, [])); 
 x = reshape(x + (0:nStates:nStates * (nt - 1)), [], 1);
 y = reshape(y + (nStates:nStates:nStates * nt), [], 1);
-A = sparse(x, y, 1); % "1" can be replaced with "true" if we want to save space
-A = A(nt*nStates, nt*nStates);
+% Detection of the unneeded nonzero elements:
+idx = (x <= nt*nStates) & (y <= nt*nStates);
+A = sparse(x(idx), y(idx), 1, nt*nStates, nt*nStates); % "true" can be used instead of "1" to save memory
 % figure(); spy(A);
 
 %% Compute costs
