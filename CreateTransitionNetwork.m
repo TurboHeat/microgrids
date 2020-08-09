@@ -1,48 +1,52 @@
-function g = CreateTransitionNetwork(kwargs) 
- %--------------------------------------------------------------%
- % TODO
- %--------------------------------------------------------------%
+function g = CreateTransitionNetwork(kwargs)
+%--------------------------------------------------------------%
+% TODO:
+% Add source and terminal node.
+%--------------------------------------------------------------%
 
 %% Handle inputs:
 arguments % accepted key-value pairs:
-  kwargs.smin (1,1) uint8 = 1;  % minimum 'on' speed level
-  kwargs.smax (1,1) uint8 = 25; % maximum speed level
-  kwargs.vmin (1,1) uint8 = 0;  % minimum bypass valve level (corresponds to 0% )
-  kwargs.vmax (1,1) uint8 = 9;  % maximum bypass valve level (corresponds to 90%)
-  kwargs.dt   (1,1) double = 15; % duration of a step [s]
-  kwargs.endTime (1,1) uint16 = 24*60; % final time [min]. Default: 24 [h/day] * 60 [min/h]  
-  kwargs.savePath (1,1) string = fullfile(fileparts(mfilename('fullpath')), "Data");
+  kwargs.smin(1, 1) uint8 = 1; % minimum 'on' speed level
+  kwargs.smax(1, 1) uint8 = 25; % maximum speed level
+  kwargs.vmin(1, 1) uint8 = 0; % minimum bypass valve level (corresponds to 0% )
+  kwargs.vmax(1, 1) uint8 = 9; % maximum bypass valve level (corresponds to 90%)
+  kwargs.dt(1, 1) double = 15; % duration of a step [s]
+  kwargs.endTime(1, 1) uint16 = 24 * 60; % final time [min]. Default: 24 [h/day] * 60 [min/h]
+  kwargs.savePath(1, 1) string = fullfile(fileparts(mfilename('fullpath')), "Data");
 end
 
 % Unpack inputs:
 smin = kwargs.smin;
 smax = kwargs.smax;
-vmin = kwargs.vmin; 
-vmax = kwargs.vmax; 
-dt = kwargs.dt; 
-endTime = kwargs.endTime; 
-savePath = kwargs.savePath; 
+vmin = kwargs.vmin;
+vmax = kwargs.vmax;
+dt = kwargs.dt;
+endTime = kwargs.endTime;
+savePath = kwargs.savePath;
+if (~exist(savePath))
+  mkdir(savePath);
+end
 
 %% Constants:
-SECONDS_PER_MINUTE = 60; 
+SECONDS_PER_MINUTE = 60;
 
 %% Preliminary computations:
 tStartup = 120 / dt + 8 * 2; % [timesteps]
 tShutdown = 180 / dt; % [timesteps]
-stepsPerMinute = SECONDS_PER_MINUTE / dt; 
+stepsPerMinute = SECONDS_PER_MINUTE / dt;
 nt = single(endTime*stepsPerMinute); % number of time steps
-ns = (smax - smin + 1); 
-nv = (vmax - vmin + 1); 
+ns = (smax - smin + 1);
+nv = (vmax - vmin + 1);
 nWorkingStates = ns * nv; % number of possible nodes per time step, excluding the 'off' state
-nStates = single(nWorkingStates+1); 
+nStates = single(nWorkingStates+1);
 
 %% Generate all states
-[SS, VV] = ndgrid(uint16(smin:smax), uint16(vmin:vmax)); 
+[SS, VV] = ndgrid(uint16(smin:smax), uint16(vmin:vmax));
 svToStateNumber = [0, 0; [SS(:), VV(:)]]; % this will be used in the uint32 mapping
 %{
-[SS, TT] = ndgrid(1:nStates, 1:nt); 
+[SS, TT] = ndgrid(1:nStates, 1:nt);
 tSr = [zeros(1, 3, 'uint16'); ... % Special row indicating "start"
-[TT(:), SS(:), nt - TT(:)]; ... 
+[TT(:), SS(:), nt - TT(:)]; ...
 intmax('uint16') * ones(1, 3, 'uint16')];% Special row indicating "finish"
 %{
   tSr = [nan(2,3); [TT(:), SS(:), nt-TT(:)]]; % formerly, "aux_table"
@@ -51,17 +55,32 @@ intmax('uint16') * ones(1, 3, 'uint16')];% Special row indicating "finish"
 
 %% Create adjacency (transitions) matrix
 % Build transitions from a single time step
-B = BuildStateAdjacencyMatrix(svToStateNumber, tStartup, tShutdown); 
+B = BuildStateAdjacencyMatrix(svToStateNumber, tStartup, tShutdown);
 % figure(); spy(reshape(B, nStates, []));
 
 % Replicate allowed transitions for all time steps (https://stackoverflow.com/q/63171491/)
 % Compute the indices:
-[x, y] = find(reshape(B, nStates, [])); 
-x = reshape(x + (0:nStates:nStates * (nt - 1)), [], 1);
-y = reshape(y + (nStates:nStates:nStates * nt), [], 1);
+[x, y] = find(reshape(B, nStates, []));
+x = reshape(x+(0:nStates:nStates * (nt - 1)), [], 1);
+y = reshape(y+(nStates:nStates:nStates * nt), [], 1);
+
+%Add source node:
+x = x + 1; %Make room for another node at index 1
+y = y + 1; %Make roon for another node at index 1
+x = [ones(nStates, 1); x]; %Add edges corresponding to source node
+y = [(2:(nStates + 1))'; y]; %Add edges corresponding to source node
+
+%Add terminal node:
+idx = (x <= nt * nStates) & (y <= nt * nStates);
+x = x(idx);
+y = y(idx);
+Index = max(y) + 1;
+y = [y; Index * ones(nStates, 1)];
+x = [x; ((Index - nStates):(Index - 1))'];
+
 % Detection of the unneeded nonzero elements:
-idx = (x <= nt*nStates) & (y <= nt*nStates);
-A = sparse(x(idx), y(idx), 1, nt*nStates, nt*nStates); % "true" can be used instead of "1" to save memory
+idx = (x <= nt * nStates + 2) & (y <= nt * nStates + 2);
+A = sparse(x(idx), y(idx), 1, nt*nStates+2, nt*nStates+2); % "true" can be used instead of "1" to save memory
 % figure(); spy(A);
 
 %% Compute costs
@@ -80,7 +99,7 @@ uTransitions = sm.toUint(fromState, toState, fromTime);
 %}
 
 %% Create di(rected )graph
-g = digraph(A); 
+g = digraph(A);
 %{
 hF = figure(); hAx = axes(hF); hG = plot(hAx, g);
 layout(h,'layered','Direction','right','Source',[{'Start'}], 'Sink', [{'End'}]); % FIXME
@@ -89,5 +108,5 @@ labelnode(h, [{'Start'}, {'End'}], {'Start', 'End'})
 %}
 
 %% Save results
-saveFile = string(datetime('now','Format','yyMMdd_HHmmss_')) + 'graph_' + num2str(endTime/60) + 'h.mat'; 
-save(fullfile(savePath, saveFile), 'g', 'A'); 
+saveFile = ['graph_', num2str(endTime/60), 'h.mat'];
+save(fullfile(savePath, saveFile), 'g', 'A', 'svToStateNumber');

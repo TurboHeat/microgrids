@@ -8,9 +8,26 @@
 % Exports the figures to eps format so they can be compiled into a single
 % document using LaTex.
 %--------------------------------------------------------------%
-close all; clearvars; clc;
-addpath(genpath('C:\Users\migueld\Dropbox\Technion Grand Energy Program\Miguel Dias\Data'));
-load graph_data_all_days.mat ;
+
+%Startup:
+% The variable decided_costs takes too much room to be saved normally. If
+% it already exists in the workspace, don't delete it. If it does not
+% exist, load it and convert it to double.
+if (exist('decided_costs', 'var'))
+  clearvars - except decided_costs;
+  close all;
+  clc;
+  addpath(genpath('C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data'));
+  load('graph_data_all_days.mat', '-regexp', '[^decided_costs]');
+else
+  clearvars;
+  close all;
+  clc;
+  addpath(genpath('C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data'));
+  load graph_data_all_days.mat;
+  decided_costs = double(decided_costs);
+end
+
 
 % d_index; 1-3-> Large; 4-6->FSR; 7-9->Small restaurant; % 10-12->Residential
 %d_index=mod(index,12)+[mod(index,12)==0]*12;
@@ -21,8 +38,6 @@ T = end_time * n_lines; %number of time steps
 t_plot = (1:n_lines * end_time)' ./ n_lines;
 savepath = 'C:\Users\migueld\Dropbox\Technion Grand Energy Program\Miguel Dias\Data\Case_Study_Images\';
 save_fig = 1;
-
-N = 2; % number of MGT
 
 %%
 joule2kWh = 1 / 3.6e6; %1kWh=3.6e6J
@@ -74,64 +89,16 @@ for i = 1:numel(fuel_index)
   ylabel('Rate ($/kWh)');
   title('Applicable electric rate');
   
-  %% Multiturbine case : Anoop
-  
-  %      lambda_P = zeros(length(to_state_map),1); %initialize
-  %      lambda_H = zeros(length(to_state_map),1); %initialize
-  
-  %      lambda_P = zeros(length(to_state_map),numel(BUILDING)*numel(DAY)*numel(price_kg_f)); %initialize
-  %      lambda_H = zeros(length(to_state_map),numel(BUILDING)*numel(DAY)*numel(price_kg_f)); %initialize
-  
-  lambda_p = zeros(T, 1);
-  lambda_h = zeros(T, 1);
-  
-  gamma = 0.01;
-  limit = 10;
-  
-  for iter = 1:limit
-    
-    %caluclate subgradient
-    
-    %   subgradient_P = av_P_produced - av_P_demand;
-    %   subgradient_H = av_H_produced - av_H_demand;
-    
-    %decided_costs(:,i) = decided_costs(:,i) + lambda_P + lambda_H;
-    
-    g = digraph(state_from, state_to, decided_costs(:, i));
-    [path, path_length] = shortestpath(g, 'Start', 'End', 'Method', 'acyclic');
-    [power_MGT(:, i), heat_MGT(:, i), mdot_MGT(:, i)] = extract_path(path, power_map, heat_map, fuel_map, SV_states);
-    path_cost(:, i) = path_length;
-    
-    %  subgradient_P = power_demand - sum(power_MGT);
-    %  subgradient_H = heat_demand - sum(heat_MGT);
-    %
-    %
-    %  lambda_P = lambda_P + gamma.*subgradient_P;
-    %  lambda_H = lambda_H + gamma.*subgradient_H;
-    
-    %total_power_MGT = N*power_MGT(:,i);
-    %total_heat_MGT = N*heat_MGT(:,i);
-    
-    
-    %Compute subgradients
-    lambda_p = power_demand(:, d_index) - N * power_MGT(:, i);
-    lambda_h = heat_demand(:, d_index) - N * power_MGT(:, i);
-    lambda = lambda + gamma * [lambda_p, lambda_h];
-    
-    
-  end
-  
-  %g=digraph(state_from, state_to, decided_costs(:,i));
-  %[path ,path_length] = shortestpath(g,'Start','End','Method','acyclic');
-  %[power_MGT(:,i), heat_MGT(:,i), mdot_MGT(:,i)] = extract_path(path, power_map, heat_map,fuel_map,SV_states);
-  %path_cost(:,i)=path_length;
-  
   %%
+  g = digraph(state_from, state_to, decided_costs(:, i));
+  [path, path_length] = shortestpath(g, 1, max(state_to), 'Method', 'acyclic');
+  [power_MGT(:, i), heat_MGT(:, i), mdot_MGT(:, i)] = extract_path(path, power_map, heat_map, fuel_map, SV_states);
+  path_cost(:, i) = path_length;
+  
   
   h1 = figure(3);
-  plot(t_plot, power_demand(:, d_index)/1e3, t_plot, N*power_MGT(:, i)/1e3, t_plot, (power_demand(:, d_index) - N * power_MGT(:, i))/1e3, 'LineWidth', 2); %in kW
-  set(gca, 'fontsize', 14)
-  %legend('Power demand','CHP commitement', 'Utility commitement');
+  plot(t_plot, power_demand(:, d_index)/1e3, t_plot, power_MGT(:, i)/1e3, t_plot, (power_demand(:, d_index) - power_MGT(:, i))/1e3, 'LineWidth', 2); %in kW
+  legend('Power demand', 'CHP commitement', 'Utility commitement');
   xlim([0, 25]);
   ylim([0, Inf]);
   grid on;
@@ -140,9 +107,8 @@ for i = 1:numel(fuel_index)
   hold off;
   
   h2 = figure(4);
-  plot(t_plot, heat_demand(:, d_index)/1e3, t_plot, N*heat_MGT(:, i)/1e3, t_plot, (heat_demand(:, d_index) - N * heat_MGT(:, i))/1e3, 'LineWidth', 2); %in Kw
-  set(gca, 'fontsize', 14)
-  %legend('Heat demand','CHP commitement', 'Utility commitement');
+  plot(t_plot, heat_demand(:, d_index)/1e3, t_plot, heat_MGT(:, i)/1e3, t_plot, (heat_demand(:, d_index) - heat_MGT(:, i))/1e3, 'LineWidth', 2); %in Kw
+  legend('Heat demand', 'CHP commitement', 'Utility commitement');
   xlim([0, 25]);
   ylim([0, Inf]);
   grid on;
@@ -159,14 +125,14 @@ for i = 1:numel(fuel_index)
     end
   %}
   %Save just case study .fig files and eps
-  if save_fig && fuel_index(i) == 1
-    figname = ['FC', num2str(fuel_index(i)), 'B', num2str(tariff_map(d_index, 1)), 'D', num2str(tariff_map(d_index, 2))];
-    savefig(h1, [savepath, 'Power_MGT', figname, '.fig']);
-    savefig(h2, [savepath, 'Heat_MGT', figname, '.fig']);
-    set(gcf, 'PaperPositionMode', 'auto');
-    print('-f3', [savepath, 'eps_noleg\', 'Power_MGT', figname], '-depsc')
-    print('-f4', [savepath, 'eps_noleg\', 'Heat_MGT', figname], '-depsc')
-  end
+  %  if save_fig && fuel_index(i)==1
+  %      figname=['FC', num2str(fuel_index(i)), 'B', num2str(tariff_map(d_index,1)), 'D', num2str(tariff_map(d_index,2))];
+  %      savefig(h1,[savepath, 'Power_MGT', figname, '.fig']);
+  %      savefig(h2,[savepath, 'Heat_MGT', figname, '.fig']);
+  %      set(gcf, 'PaperPositionMode', 'auto');
+  %      print('-f3',[savepath,'eps_noleg\', 'Power_MGT', figname],'-depsc')
+  %      print('-f4',[savepath,'eps_noleg\', 'Heat_MGT', figname],'-depsc')
+  %  end
   new_demand(:, i) = subplus(power_demand(:, d_index)-power_MGT(:, i));
   bought_elec(i) = sum(subplus(power_demand(:, d_index)-power_MGT(:, i)).*dt*joule2kWh.*elec_tariff(:, d_index)); %in $
   sold_energy(i) = sum(subplus(-1.*(power_demand(:, d_index) - power_MGT(:, i))).*dt*joule2kWh.*elec_tariff(:, d_index)); %in $
@@ -175,12 +141,11 @@ for i = 1:numel(fuel_index)
   MGT_cost(i) = bought_elec(i) - sold_energy(i) + bought_fuel(i) + bought_heat(i); %in $
   [MGT_PDC(i), MGT_IDC(i), ut_PDC(i), ut_IDC(i), FC(i)] = GenerateDemandCharges(d_index, dt, power_demand(:, d_index), new_demand(:, i));
   % Absolute savings:
-  savings(:, i) = total_charge(:, i) - path_cost(:, i);
+  %  savings(:,i)=total_charge(:,i)-path_cost(:,i);
+  savings(i) = total_charge(i) - MGT_cost(i);
+  1;
 end
 disp(['All data saved to folder ', savepath]);
-
-%% Economic metrics:
-%t_path=[path.', circshift(path,1,2).'];
 
 %% Save economic data
 savepath = 'C:\Users\migueld\Dropbox\Technion Grand Energy Program\Miguel Dias\Data\';

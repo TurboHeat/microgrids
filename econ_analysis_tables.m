@@ -19,6 +19,8 @@ load econ_data.mat ;
 load graph_data_all_days.mat price_ft3;
 fuel_index = [1 * ones(12, 1); 2 * ones(12, 1); 3 * ones(12, 1)];
 
+canSave = 0; %Uses a try/catch mechanism - if we save too fast, we get an error...
+
 %issue with fixed cost for res building:
 FC([10:12, 22:24, 34:36]) = 1.65;
 
@@ -98,15 +100,31 @@ for i = 1:3:36
   f_ind = fuel_index(i);
   d_index = mod(i, 12) + (mod(i, 12) == 0) * 12;
   bd = tariff_map(d_index, 1);
-  xlswrite(filename, {['Econ Summary, Building ', num2str(bd), ' FC = ', num2str(price_ft3(f_ind)), ' $/1000 ft3']}, ['B', num2str(bd), 'FC', num2str(f_ind)], 'A2');
+  pause(0.5);
+  while (canSave == 0)
+    try
+      xlswrite(filename, {['Econ Summary, Building ', num2str(bd), ' FC = ', num2str(price_ft3(f_ind)), ' $/1000 ft3']}, ['B', num2str(bd), 'FC', num2str(f_ind)], 'A2');
+      canSave = 1;
+    catch
+    end
+  end
+  canSave = 0;
   for day = 1:3
+    pause(0.5);
     econ_sum = table;
     econ_sum.Electricity = [base_electricity_charge(i+day-1); bought_elec(i+day-1) - sold_energy(i+day-1); 0];
     econ_sum.Heat = [base_heat_charge(i+day-1); bought_heat(i+day-1); 0];
     econ_sum.Fuel = [0; bought_fuel(i+day-1); 0];
     econ_sum.Total = [total_charge(i+day-1); MGT_cost(i+day-1); savings(i+day-1)];
     econ_sum.Properties.RowNames = RowNames;
-    writetable(econ_sum, filename, 'Sheet', ['B', num2str(bd), 'FC', num2str(f_ind)], 'Range', WriteRange{day}, 'WriteRowNames', true);
+    while (canSave == 0)
+      try
+        writetable(econ_sum, filename, 'Sheet', ['B', num2str(bd), 'FC', num2str(f_ind)], 'Range', WriteRange{day}, 'WriteRowNames', true);
+        canSave = 1;
+      catch
+      end
+    end
+    canSave = 0;
   end
 end
 
@@ -120,13 +138,28 @@ for i = 1:3:36
   f_ind = fuel_index(i);
   d_index = mod(i, 12) + (mod(i, 12) == 0) * 12;
   bd = tariff_map(d_index, 1);
-  xlswrite(filename, {['Demand Pricing Summary, Building ', num2str(bd), ' FC = ', num2str(price_ft3(f_ind)), ' $/1000 ft3']}, ['B', num2str(bd), 'FC', num2str(f_ind)], 'J2');
+  pause(0.5);
+  while (canSave == 0)
+    try
+      xlswrite(filename, {['Demand Pricing Summary, Building ', num2str(bd), ' FC = ', num2str(price_ft3(f_ind)), ' $/1000 ft3']}, ['B', num2str(bd), 'FC', num2str(f_ind)], 'J2');
+      canSave = 1;
+    catch
+    end
+  end
+  canSave = 0;
   for day = 1:3
     demand_sum = table;
     demand_sum.BaseDC = [ut_PDC(i+day-1); ut_IDC(i+day-1)];
     demand_sum.MGTDC = [MGT_PDC(i+day-1); MGT_IDC(i+day-1)];
     demand_sum.Savings = demand_sum.BaseDC - demand_sum.MGTDC;
     demand_sum.Properties.RowNames = RowNames;
-    writetable(demand_sum, filename, 'Sheet', ['B', num2str(bd), 'FC', num2str(f_ind)], 'Range', WriteRange{day}, 'WriteRowNames', true);
+    while (canSave == 0)
+      try
+        writetable(demand_sum, filename, 'Sheet', ['B', num2str(bd), 'FC', num2str(f_ind)], 'Range', WriteRange{day}, 'WriteRowNames', true);
+        canSave = 1;
+      catch
+      end
+    end
+    canSave = 0;
   end
 end

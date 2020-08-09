@@ -1,8 +1,8 @@
 %--------------------------------------------------------------%
 % File: assign_costs_multi_unit_fcn.m (script)
 % Author: Miel Sharf
-% Date 12/5/2020
-% v1.0
+% Date 08/8/2020
+% v2.0
 % Description: Assign costs to edges for the shortest path solver/
 % Included transition penalty to deal with oscillations.
 % Costs only model fuel costs for the turbines - the demand is dealt with
@@ -19,12 +19,16 @@ Weight2 = 1;
 
 warning off 'MATLAB:strrep:InvalidInputType'
 
-%% Average mass flow rate
+% average mass flow rate
+%%% If you get an error here - check whether the length of mdot_fuel_SU is
+%%% equal to 10 - otherwise, update the fourth row in the following
+%%% computation accordingly by changing the 10 to the length of
+%%% mdot_fuel_SU.
 
 av_mdot = [zeros(length(n_tsteps), 1), ... %1st column (what is it?)
   ...
   [zeros(total_nodes, 1); ...
-  strrep(sol_select(total_nodes+1:end-total_nodes).', 2*ones(1, 5), mdot_fuel_SU.').'; ...
+  strrep(sol_select(total_nodes+1:end-total_nodes).', 2*ones(1, 10), mdot_fuel_SU.').'; ...
   zeros(total_nodes, 1)], ... 2nd column ->Startup
   ...
   zeros(length(n_tsteps), 1), ... 3rd column

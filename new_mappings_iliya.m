@@ -14,6 +14,7 @@
 % from_state_map - maps number assigned by SV_states to the 'to' node
 % time_map - maps time step (not used)
 %--------------------------------------------------------------%
+
 function [SV_states, time_from, dT, from_state_map, to_state_map] = new_mappings_iliya(Transition_t)
 
 %% Generate mapping:
@@ -72,3 +73,13 @@ assert(~any(~from_state_map) && ~any(~to_state_map), 'There shoud be no zero sta
 time_from = dT(1:size(dT, 1)/2, 1);
 dT = diff(reshape(dT(:, 1), [], 2), 1, 2);
 % Only now dT contains what its name implies
+
+%
+%
+%
+%
+% SV_states - all possible (s,v) pairs. off is equal to (0,0)
+% from_state_map - the index (in SV_states) of the from state of the edge.
+% to_state_map - the index (in SV_states) of the to state of the edge.
+% time_from - time of from state of the edge.
+% dT - Transition length

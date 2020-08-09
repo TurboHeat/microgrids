@@ -14,31 +14,33 @@
 function [power_return, heat_return] = CreateDemandProfileVector(buildingtype, day, dt)
 n_lines = 3600 / dt;
 n_residential = 20;
+power = [];
+heat = [];
 switch buildingtype
   case 1 % Large Hotel
-    %load('Demand Profiles\DemandLargeHotel.mat')
+    load('Demand Profiles\DemandLargeHotel.mat')
     %load('DemandLargeHotel.mat')
-    load('Demand Profiles/DemandLargeHotel.mat') % mac syntax
+    %         load('Demand Profiles/DemandLargeHotel.mat') % mac syntax
     power_return(1, :) = power(:, day);
     heat_return(1, :) = heat(:, day);
   case 2 % Full Service Restaurant
-    %load('Demand Profiles\DemandFSR.mat')
-    load('Demand Profiles/DemandFSR.mat') % mac syntax
+    load('Demand Profiles\DemandFSR.mat')
+    %         load('Demand Profiles/DemandFSR.mat') % mac syntax
     power_return(1, :) = power(:, day);
     heat_return(1, :) = heat(:, day);
   case 3 % Small Hotel
-    %load('Demand Profiles\DemandSmallHotel.mat')
-    load('Demand Profiles/DemandSmallHotel.mat') % mac syntax
+    load('Demand Profiles\DemandSmallHotel.mat')
+    %         load('Demand Profiles/DemandSmallHotel.mat') % mac syntax
     power_return(1, :) = power(:, day);
     heat_return(1, :) = heat(:, day);
   case 4 % Residential One Unit * n_residential
-    %load('Demand Profiles\DemandResidentialOneUnit.mat')
-    load('Demand Profiles/DemandResidentialOneUnit.mat') % mac syntax
+    load('Demand Profiles\DemandResidentialOneUnit.mat')
+    %         load('Demand Profiles/DemandResidentialOneUnit.mat') % mac syntax
     power_return(1, :) = power(:, day) * n_residential;
     heat_return(1, :) = heat(:, day) * n_residential;
   case 5 % Hospital
-    %load('Demand Profiles\DemandHospital.mat')
-    load('Demand Profiles/DemandHospital.mat') % mac syntax
+    load('Demand Profiles\DemandHospital.mat')
+    %         load('Demand Profiles/DemandHospital.mat') % mac syntax
     power_return(1, :) = power(:, day);
     heat_return(1, :) = heat(:, day);
 end

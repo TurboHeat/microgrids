@@ -1,8 +1,8 @@
 %--------------------------------------------------------------%
 % File: assign_all_costs_multi_unit.m (script)
 % Author: Miel Sharf
-% Date 12/5/2020
-% v1.0
+% Date 05/08/20
+% v2.0
 % Description: Run all combinations of days and building to check if the
 % tariffs are beeing correcty applied to all days of operations.
 % Plots all combinations. The tariffs are valid for all seasons.
@@ -102,12 +102,25 @@ if show_plot
 end
 
 %% Run Iliya's mapping and save all the variables at once
-load graph24h.mat 'Transition_t';
-state_from = Transition_t.state_t;
-state_to = Transition_t.state_t1;
-[SV_states, time_from, n_tsteps, from_state_map, to_state_map] = new_mappings_iliya(Transition_t);
-clear Transition_t;
+load graph_24h.mat 'g' 'svToStateNumber';
+state_from = g.Edges.EndNodes(:, 1);
+state_to = g.Edges.EndNodes(:, 2);
+possible_s = 1:25;
+possible_v = 0:9;
+%%%
+total_nodes = length(svToStateNumber); %smax*(vmax+1)+1
+[SV_states, time_from, n_tsteps, from_state_map, to_state_map] = new_mappings_iliya_revised(state_from, state_to, svToStateNumber);
+clear A g;
 load 'sv_mappings'
+if ~exist('power_map')
+  power_map = PowerSurf;
+end
+if ~exist('heat_map')
+  heat_map = PheatSurfExt;
+end
+if ~exist('m_dot_f_map')
+  m_dot_f_map = FFSurfExt;
+end
 
 %% Natural gas parameter
 Qr = 49736500; %J/kg
@@ -129,7 +142,7 @@ heat_tariff = price_kWh;
 power_map = [reshape(power_map.', [], 1); 0];
 heat_map = [reshape(heat_map.', [], 1); 0];
 fuel_map = [reshape(m_dot_f_map.', [], 1); 0];
-mdot_fuel_SU = sum(m_dot_f_map(:, 1:end-1)+m_dot_f_map(:, 2:end), 2); % Computes mdot of fuel consumed in startup for the 5 different max states
+mdot_fuel_SU = sum(m_dot_f_map(:, 1:end-1)+m_dot_f_map(:, 2:end), 2); % Computes mdot of fuel consumed in startup for all the different max states
 % Select right column with the final price
 sol_select = [~SV_states(from_state_map, 1) & ~SV_states(to_state_map, 1), ... % Off-off
   ~SV_states(from_state_map, 1) & SV_states(to_state_map, 1), ... % Start up
@@ -143,6 +156,8 @@ is_transition = [zeros(total_nodes, 1); ...
   SV_states(from_state_map(total_nodes+1:end-total_nodes), 2) ==, SV_states(to_state_map(total_nodes+1:end-total_nodes), 2)]; ...
   zeros(total_nodes, 1)];%checks equality of V values
 %% Main loop to assign edges
+lambda = zeros(T, 2);
+%call lambda
 k = 1;
 decided_costs = zeros(length(to_state_map), numel(BUILDING)*numel(DAY)*numel(price_kg_f));
 for cost = 1:numel(price_kg_f)
@@ -154,10 +169,13 @@ for cost = 1:numel(price_kg_f)
 end
 
 %%
+aux = decided_costs;
+decided_costs = single(decided_costs);
 save([savepath, 'all_data.mat'], 'tariff_map', 'elec_tariff', 'power_demand', ...
   'heat_demand', 'SV_states', 'time_from', 'n_tsteps', 'heat_tariff', ...
   'from_state_map', 'to_state_map', 'heat_map', 'm_dot_f_map', 'power_map', ...
   'price_kg_f', 'decided_costs', 'state_from', 'state_to', 'sol_select');
 
 %g1=digraph(state_from, state_to, decided_costs(:,1));
-save([savepath, 'graph_data_all_days.mat']);
+save([savepath, 'graph_data_all_days.mat'], '-regexp', '[^aux]');
+decided_costs = aux;

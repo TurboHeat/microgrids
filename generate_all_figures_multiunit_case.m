@@ -1,7 +1,7 @@
 %--------------------------------------------------------------%
-% File: generate_all_figures.m (script)
+% File: generate_all_figures_multi_unit_case.m (script)
 % Author: Miel Sharf
-% Date 09/05/2020
+% Date 08/08/2020
 % v2.0
 % Description: Solves the economic dispatch problem using a mixture of
 % shortest-path solvers and a gradient descent approach for the
@@ -10,12 +10,24 @@
 % Exports the figures to eps format so they can be compiled into a single
 % document using LaTex.
 %--------------------------------------------------------------%
-
-%% Load the turbine data - dynamics graph, costs, etc.
-close all; clearvars; clc;
-addpath(genpath('C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data'));
-load graph_data_all_days.mat ;
-
+%Startup:
+% The variable decided_costs takes too much room to be saved normally. If
+% it already exists in the workspace, don't delete it. If it does not
+% exist, load it and convert it to double.
+if (exist('decided_costs', 'var'))
+  clearvars - except decided_costs;
+  close all;
+  clc;
+  addpath(genpath('C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data'));
+  load('graph_data_all_days.mat', '-regexp', '[^decided_costs]');
+else
+  clearvars;
+  close all;
+  clc;
+  addpath(genpath('C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data'));
+  load graph_data_all_days.mat;
+  decided_costs = double(decided_costs);
+end
 % Make sure that key parameters are defined
 if ~exist('end_time', 'var')
   end_time = 24; %end time in h.
@@ -51,23 +63,6 @@ save_fig = 1;
 savepath = 'C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data\Case_Study_Images\';
 
 FontSize = 20; %Font Size
-
-%% Check for Dan - simple case.
-n_MGTs = 2; %number of Multi-Gas Turbines.
-
-power_demand(:, 1) = 110000; %Full power of one turbine
-power_demand(:, 2) = 110000;
-power_demand(:, 3) = 60000; %Half power of one turbine
-power_demand(:, 4) = 60000;
-power_demand(:, 5) = 160000; %~1.5 times of full power of one turbine
-power_demand(:, 6) = 160000;
-
-heat_demand(:, 1) = heat_map(45); %Most possible heat in this scenario
-heat_demand(:, 2) = heat_map(9); %Least possible heat in this scenario
-heat_demand(:, 3) = heat_map(40); %Most possible heat in this scenario
-heat_demand(:, 4) = heat_map(4); %Least possible heat in this scenario
-heat_demand(:, 5) = heat_map(45) + heat_map(40); %Most possible heat in this scenario
-heat_demand(:, 6) = heat_map(9) + heat_map(4); %Least possible heat in this scenario
 
 %% Initialize all vectors for the loop
 
@@ -122,8 +117,7 @@ for mgt = 1:n_MGTs
 end
 
 %% Run the solution method - iterate over all day-building-fuel cost combinations.
-for i = 1:6 %length(fuel_index)
-  tic
+for i = 1:length(fuel_index)
   d_index = mod(i, 12) + (mod(i, 12) == 0) * 12;
   %d_index is the day-building combination:
   %1 - Large Hotel, Winter
@@ -182,8 +176,8 @@ for i = 1:6 %length(fuel_index)
     for mgt = 1:n_MGTs
       %ADD EFFECT OF LAMBDA!!!!!
       graphs_MGTs{mgt}.Edges.Weight = overall_cost(EdgePermutationMap) + 0.1 * is_transition(EdgePermutationMap);
-      StartNode = 'Start';
-      EndNode = 'End';
+      StartNode = 1;
+      EndNode = max(state_to);
       [path, path_length] = shortestpath(graphs_MGTs{mgt}, StartNode, EndNode, 'Method', 'acyclic');
       [power_MGTs{mgt}(:, i), heat_MGTs{mgt}(:, i), mdot_MGTs{mgt}(:, i)] = extract_path(path, power_map, heat_map, fuel_map, SV_states);
       path_cost(mgt, i) = path_length;
@@ -319,8 +313,8 @@ for i = 1:6 %length(fuel_index)
   new_demand(:, i) = subplus(power_demand(:, d_index)-power_MGT_Total);
   bought_elec(i) = sum(subplus(power_demand(:, d_index)-power_MGT_Total).*dt*joule2kWh.*elec_tariff(:, d_index)); %in $
   sold_energy(i) = sum(subplus(-1.*(power_demand(:, d_index) - power_MGT_Total)).*dt*joule2kWh.*elec_tariff(:, d_index)); %in $
-  %     bought_fuel(i)=sum((mdot_MGTs{1}(:,i)+mdot_MGTs{2}(:,i)+mdot_MGTs{3}(:,i)+mdot_MGTs{4}(:,i))*dt*price_kg_f(fuel_index(i))); %in $
-  bought_fuel(i) = sum((mdot_MGTs{1}(:, i) + mdot_MGTs{2}(:, i))*dt*price_kg_f(fuel_index(i))); %in $
+  %Make Generic for n_MGTs.
+  bought_fuel(i) = sum((mdot_MGTs{1}(:, i) + mdot_MGTs{2}(:, i) + mdot_MGTs{3}(:, i) + mdot_MGTs{4}(:, i))*dt*price_kg_f(fuel_index(i))); %in $
   bought_heat(i) = sum(subplus(heat_demand(:, d_index)-heat_MGT_Total).*dt*joule2kWh.*heat_tariff(fuel_index(i))); %in $
   MGT_cost(i) = bought_elec(i) - sold_energy(i) + bought_fuel(i) + bought_heat(i); %in $
   [MGT_PDC(i), MGT_IDC(i), ut_PDC(i), ut_IDC(i), FC(i)] = GenerateDemandCharges(d_index, dt, power_demand(:, d_index), new_demand(:, i));
