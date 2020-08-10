@@ -1,5 +1,4 @@
 %--------------------------------------------------------------%
-% File: CreateElectricityTariffProfile.m (function)
 % Author: Miguel Dias
 % Date 14/08/16
 % v1.0
@@ -16,7 +15,7 @@
 %           2. - 10.th April - winter
 %           3. - 10.th July - summer
 %--------------------------------------------------------------%
-function [MGT_PDC, MGT_IDC, ut_PDC, ut_IDC, FC] = GenerateDemandCharges(d_index, dt, power_demand, new_demand)
+function [MGT_PDC, MGT_IDC, ut_PDC, ut_IDC, FC] = generateDemandCharges(d_index, dt, power_demand, new_demand)
 tariff_map = uint8([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4; 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]).'; %B, D
 building_type = tariff_map(d_index, 1);
 day = tariff_map(d_index, 2);

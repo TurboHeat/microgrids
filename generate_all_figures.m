@@ -14,7 +14,7 @@
 % it already exists in the workspace, don't delete it. If it does not
 % exist, load it and convert it to double.
 if (exist('decided_costs', 'var'))
-  clearvars - except decided_costs;
+  clearvars('-except', 'decided_costs');
   close all;
   clc;
   addpath(genpath('..\Data'));
@@ -92,7 +92,7 @@ for i = 1:numel(fuel_index)
   %%
   g = digraph(state_from, state_to, decided_costs(:, i));
   [path, path_length] = shortestpath(g, 1, max(state_to), 'Method', 'acyclic');
-  [power_MGT(:, i), heat_MGT(:, i), mdot_MGT(:, i)] = extract_path(path, power_map, heat_map, fuel_map, SV_states);
+  [power_MGT(:, i), heat_MGT(:, i), mdot_MGT(:, i)] = extractPath(path, power_map, heat_map, fuel_map, SV_states);
   path_cost(:, i) = path_length;
   
   
@@ -139,7 +139,7 @@ for i = 1:numel(fuel_index)
   bought_fuel(i) = sum(mdot_MGT(:, i)*dt*price_kg_f(fuel_index(i))); %in $
   bought_heat(i) = sum(subplus(heat_demand(:, d_index)-heat_MGT(:, i)).*dt*joule2kWh.*heat_tariff(fuel_index(i))); %in $
   MGT_cost(i) = bought_elec(i) - sold_energy(i) + bought_fuel(i) + bought_heat(i); %in $
-  [MGT_PDC(i), MGT_IDC(i), ut_PDC(i), ut_IDC(i), FC(i)] = GenerateDemandCharges(d_index, dt, power_demand(:, d_index), new_demand(:, i));
+  [MGT_PDC(i), MGT_IDC(i), ut_PDC(i), ut_IDC(i), FC(i)] = generateDemandCharges(d_index, dt, power_demand(:, d_index), new_demand(:, i));
   % Absolute savings:
   %  savings(:,i)=total_charge(:,i)-path_cost(:,i);
   savings(i) = total_charge(i) - MGT_cost(i);

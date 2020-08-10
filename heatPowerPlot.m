@@ -1,4 +1,4 @@
-function heat_power_plot(heat_map)
+function heatPowerPlot(heat_map)
 
 valve_pos = 0:0.2:0.8;
 % speed = []

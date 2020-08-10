@@ -1,6 +1,7 @@
+function [] = steadyStateChecks()
 clc;
 close all;
-load 'sv_mappings'
+load('..\Data\sv_mappings.mat', 'm_dot_f_map', 'power_map');
 
 for k = 1:5
   figure(k)

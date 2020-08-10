@@ -55,7 +55,7 @@ intmax('uint16') * ones(1, 3, 'uint16')];% Special row indicating "finish"
 
 %% Create adjacency (transitions) matrix
 % Build transitions from a single time step
-B = BuildStateAdjacencyMatrix(svToStateNumber, tStartup, tShutdown);
+B = buildStateAdjacencyMatrix(svToStateNumber, tStartup, tShutdown);
 % figure(); spy(reshape(B, nStates, []));
 
 % Replicate allowed transitions for all time steps (https://stackoverflow.com/q/63171491/)

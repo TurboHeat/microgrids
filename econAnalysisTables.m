@@ -1,5 +1,5 @@
 %--------------------------------------------------------------%
-% File: econ_analysis_tables.m (script)
+% File: econAnalysisTables.m (script)
 % Author: Miguel Dias
 % Date 30/08/16
 % v1.0

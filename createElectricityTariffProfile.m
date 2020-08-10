@@ -1,5 +1,5 @@
 %--------------------------------------------------------------%
-% File: CreateElectricityTariffProfile.m (function)
+% File: createElectricityTariffProfile.m (function)
 % Author: Miguel Dias
 % Date 14/08/16
 % v1.0
@@ -16,8 +16,8 @@
 %           2. - 10.th April - winter
 %           3. - 10.th July - summer
 %--------------------------------------------------------------%
-function [tariff_vec] = CreateElectricityTariffProfile(building_type, day, dt)
-%CreateElectricityTariffProfile Returns a vector with the electricity
+function [tariff_vec] = createElectricityTariffProfile(building_type, day, dt)
+%createElectricityTariffProfile Returns a vector with the electricity
 %tariff for each time step during the considered day, for the
 % requested building. ONLY FPE, i.e. A parcel off electricity charge. B and
 % C costs are added a posteriori

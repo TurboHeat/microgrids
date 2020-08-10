@@ -11,7 +11,7 @@
 %           3. - 10.th July
 %           4. - 10.th October
 % Stepping of vector is defined with dt
-function [power_return, heat_return] = CreateDemandProfileVector(buildingtype, day, dt)
+function [power_return, heat_return] = createDemandProfileVector(buildingtype, day, dt)
 n_lines = 3600 / dt;
 n_residential = 20;
 power = [];

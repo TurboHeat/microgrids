@@ -1,14 +1,14 @@
 %--------------------------------------------------------------%
-% File: extract_path.m (function)
+% File: extractPath.m (function)
 % Author: Miel Sharf
 % Date 07/08/2020
 % v2.0
 % Description: Get MGT commitment from solution of the shortestpath
 % algorithm
-%[power_MGT, heat_MGT] = extract_path(sol_path)
+%[power_MGT, heat_MGT] = extractPath(sol_path)
 %--------------------------------------------------------------%
-function [power_MGT, heat_MGT, fuel_MGT] = extract_path(path, power_map, heat_map, fuel_map, SV_states)
-%EXTRACT_PATH: Get MGT commitment from solution of the shortestpath
+function [power_MGT, heat_MGT, fuel_MGT] = extractPath(path, power_map, heat_map, fuel_map, SV_states)
+%extractPath: Get MGT commitment from solution of the shortestpath
 % algorithm
 path_aux = path - 1; %Shift - move source node to index 0.;
 

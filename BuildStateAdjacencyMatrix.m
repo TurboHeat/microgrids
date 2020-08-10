@@ -1,5 +1,5 @@
-function [Adj] = BuildStateAdjacencyMatrix(Dictionary_uint16, T_Startup, T_Shutdown)
-%%%%%% BuildStateAdjacencyMatrix.
+function [Adj] = buildStateAdjacencyMatrix(Dictionary_uint16, T_Startup, T_Shutdown)
+%%%%%% buildStateAdjacencyMatrix.
 %{
 Input:
 Dictionary: a States x 3 array. The first column defines the s-variable

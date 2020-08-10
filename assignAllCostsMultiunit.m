@@ -1,5 +1,5 @@
 %--------------------------------------------------------------%
-% File: assign_all_costs.m (script)
+% File: assignAllCostsMultiunit.m (script)
 % Author: Miel Sharf
 % Date 05/08/20
 % v2.0
@@ -27,12 +27,15 @@ end_time = 24; %in hours
 T = end_time * n_lines; % total number of time steps in a day
 BUILDING = [1, 2, 3, 4];
 DAY      = [1 2 3];
+total_nodes = 46; %smax*(vmax+1)+1
 buildingstring = {'Large Hotel', 'Full Service Restaraunt', 'Small Hotel', 'Residential'}; %for plotting
 daystring = {'Winter', 'Spring/Autumn', 'Summer'}; %for plotting
 coststring = {'C1', 'C2', 'C3'}; %{C1, C2 C3}=[7.74 8.85 6.80] $/1000ft^3
 
+%% Define save folder
 
-%% Get all tariff combinations
+
+%% get all tariffs combinations
 
 %[Building; day]
 tariff_map = uint8([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4; 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]).';
@@ -42,8 +45,8 @@ heat_demand = zeros(T, numel(BUILDING)*numel(DAY));
 i = 1;
 for b = 1:length(BUILDING)
   for d = 1:length(DAY)
-    elec_tariff(:, i) = CreateElectricityTariffProfile(b, d, dt);
-    [power_demand(:, i), heat_demand(:, i)] = CreateDemandProfileVector(b, d, dt);
+    elec_tariff(:, i) = createElectricityTariffProfile(b, d, dt);
+    [power_demand(:, i), heat_demand(:, i)] = createDemandProfileVector(b, d, dt);
     % SMOOTHING
     if smooth_demand
       power_demand(:, i) = smooth(power_demand(:, i), smooth_time); %select appropriate amount of hours
@@ -98,7 +101,7 @@ possible_s = 1:25;
 possible_v = 0:9;
 %%%
 total_nodes = length(svToStateNumber); %smax*(vmax+1)+1
-[SV_states, time_from, n_tsteps, from_state_map, to_state_map] = new_mappings_iliya_revised(state_from, state_to, svToStateNumber);
+[SV_states, time_from, n_tsteps, from_state_map, to_state_map] = transformAdjacencyMatrix(state_from, state_to, svToStateNumber);
 clear A g;
 load 'sv_mappings'
 if ~exist('power_map')
@@ -138,11 +141,12 @@ sol_select = [~SV_states(from_state_map, 1) & ~SV_states(to_state_map, 1), ... %
   ~SV_states(to_state_map, 1), ... % Shut down
   true(numel(n_tsteps), 1)];% Remaining transitions
 [~, sol_select] = max(sol_select, [], 2);
-% assigns a small penalty to every input (s,v) change
-transition_penalty = [zeros(total_nodes, 1); ...
-  ~[SV_states(from_state_map(total_nodes+1:end-total_nodes), 1) ==, SV_states(to_state_map(total_nodes+1:end-total_nodes), 1) & ... %checks equality of S values
-  SV_states(from_state_map(total_nodes+1:end-total_nodes), 2) ==, SV_states(to_state_map(total_nodes+1:end-total_nodes), 2)]; ...
-  zeros(total_nodes, 1)];%checks equality of V values
+% checks whether an edge corresponds to a change of (s,v). Such transitions
+% will be penalized later in assignCostsMultiunit().
+is_transition = [zeros(total_nodes,1);...
+  ~[SV_states(from_state_map(total_nodes+1:end-total_nodes),1)== SV_states(to_state_map(total_nodes+1:end-total_nodes),1) &... %checks equality of S values
+    SV_states(from_state_map(total_nodes+1:end-total_nodes),2)== SV_states(to_state_map(total_nodes+1:end-total_nodes),2)];
+    zeros(total_nodes,1)]; %checks equality of V values
 %% Main loop to assign edges
 lambda = zeros(T, 2);
 %call lambda
@@ -151,7 +155,7 @@ decided_costs = zeros(length(to_state_map), numel(BUILDING)*numel(DAY)*numel(pri
 for cost = 1:numel(price_kg_f)
   fuel_price = price_kg_f(cost);
   for i = 1:numel(BUILDING) * numel(DAY)
-    decided_costs(:, k) = assign_costs_fcn(double(dt), power_map, heat_map, fuel_map, mdot_fuel_SU, total_nodes, sol_select, time_from, n_tsteps, from_state_map, to_state_map, power_demand(:, i), heat_demand(:, i), elec_tariff(:, i), heat_tariff(cost), fuel_price, transition_penalty);
+    decided_costs(:, k) = assignCostsMultiunit(double(dt), fuel_map, mdot_fuel_SU, total_nodes, sol_select, n_tsteps, from_state_map, to_state_map, fuel_price, is_transition);
     k = k + 1;
   end
 end

@@ -15,7 +15,7 @@
 % it already exists in the workspace, don't delete it. If it does not
 % exist, load it and convert it to double.
 if (exist('decided_costs', 'var'))
-  clearvars - except decided_costs;
+  clearvars('-except', 'decided_costs');
   close all;
   clc;
   addpath(genpath('..\Data'));
@@ -169,7 +169,7 @@ for i = 1:length(fuel_index)
     if (BufferIndex == 0)
       BufferIndex = BufferSize;
     end
-    decided_costs_extra = assign_costs_multi_unit_fcn_extra(total_nodes, sol_select, time_from, n_tsteps, from_state_map, to_state_map, power_map, heat_map, power_demand(:, d_index), heat_demand(:, d_index), lambda*joule2kWh*dt);
+    decided_costs_extra = assignCostsMultiunitExtra(total_nodes, sol_select, time_from, n_tsteps, from_state_map, to_state_map, power_map, heat_map, power_demand(:, d_index), heat_demand(:, d_index), lambda*joule2kWh*dt);
     overall_cost = decided_costs(:, i) + decided_costs_extra;
     
     %Every MGT solves the shortest path problem to minimize
@@ -179,7 +179,7 @@ for i = 1:length(fuel_index)
       StartNode = 1;
       EndNode = max(state_to);
       [path, path_length] = shortestpath(graphs_MGTs{mgt}, StartNode, EndNode, 'Method', 'acyclic');
-      [power_MGTs{mgt}(:, i), heat_MGTs{mgt}(:, i), mdot_MGTs{mgt}(:, i)] = extract_path(path, power_map, heat_map, fuel_map, SV_states);
+      [power_MGTs{mgt}(:, i), heat_MGTs{mgt}(:, i), mdot_MGTs{mgt}(:, i)] = extractPath(path, power_map, heat_map, fuel_map, SV_states);
       path_cost(mgt, i) = path_length;
     end
     for mgt = 1:n_MGTs
@@ -317,7 +317,7 @@ for i = 1:length(fuel_index)
   bought_fuel(i) = sum((mdot_MGTs{1}(:, i) + mdot_MGTs{2}(:, i) + mdot_MGTs{3}(:, i) + mdot_MGTs{4}(:, i))*dt*price_kg_f(fuel_index(i))); %in $
   bought_heat(i) = sum(subplus(heat_demand(:, d_index)-heat_MGT_Total).*dt*joule2kWh.*heat_tariff(fuel_index(i))); %in $
   MGT_cost(i) = bought_elec(i) - sold_energy(i) + bought_fuel(i) + bought_heat(i); %in $
-  [MGT_PDC(i), MGT_IDC(i), ut_PDC(i), ut_IDC(i), FC(i)] = GenerateDemandCharges(d_index, dt, power_demand(:, d_index), new_demand(:, i));
+  [MGT_PDC(i), MGT_IDC(i), ut_PDC(i), ut_IDC(i), FC(i)] = generateDemandCharges(d_index, dt, power_demand(:, d_index), new_demand(:, i));
   % Absolute savings:
   %Miel: Consider the cost of bought power and heat from utility in
   %savings computation

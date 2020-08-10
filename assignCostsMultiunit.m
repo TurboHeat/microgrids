@@ -1,5 +1,5 @@
 %--------------------------------------------------------------%
-% File: assign_costs_multi_unit_fcn.m (script)
+% File: assignCostsMultiunit.m (script)
 % Author: Miel Sharf
 % Date 08/8/2020
 % v2.0
@@ -8,12 +8,11 @@
 % Costs only model fuel costs for the turbines - the demand is dealt with
 % later.
 %--------------------------------------------------------------%
-function [decided_costs] = assign_costs_multi_unit_fcn(dt, fuel_map, mdot_fuel_SU, total_nodes, sol_select, n_tsteps, from_state_map, to_state_map, price_kg_f, is_transition)
+function [decided_costs] = assignCostsMultiunit(dt, fuel_map, mdot_fuel_SU, total_nodes, sol_select, n_tsteps, from_state_map, to_state_map, price_kg_f, is_transition)
 
 %% Definitions:
 Startup_cost = 3.75; % SU and SD consts are the same
 Transition_Penalty = 0; %0.01; % Higher costs for transitions.
-joule2kWh = 1 / 3.6e6; %1kWh=3.6e6J
 Weight1 = 1;
 Weight2 = 1;
 

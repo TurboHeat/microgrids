@@ -1,4 +1,4 @@
-function el_power_plot(power_map)
+function elPowerPlot(power_map)
 
 valve_pos = 0:0.2:0.8;
 % speed = []

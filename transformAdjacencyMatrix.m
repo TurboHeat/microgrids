@@ -1,12 +1,10 @@
 %--------------------------------------------------------------%
-% File: new_mapping_iliya_revised.m (script)
 % Author: Miel Sharf
 % Date 06/08/20
-% v1.0
-% Based of new_mapping_iliya
-% Description: Tranform the adjacency matrix created by
-% CreateTransitionNetwork  into an equivalent description that is
-% easier to compute with.
+% 
+% Description: Transform the adjacency matrix created by CreateTransitionNetwork
+%  into an representation description that is easier to compute with.
+% 
 % Returns:
 % SV_states - maps SV values (columns) to a linear index (in rows).
 % time_from - time step at of each 'from' transition
@@ -16,7 +14,8 @@
 % time_map - maps time step (not used)
 %--------------------------------------------------------------%
 
-function [SV_states, time_from, n_tsteps, from_state_map, to_state_map] = new_mappings_iliya_revised(state_from, state_to, svToStateNumber)
+function [SV_states, time_from, n_tsteps, from_state_map, to_state_map] = ...
+          transformAdjacencyMatrix(state_from, state_to, svToStateNumber)
 % Move the s=0,v=0 to the end of the state list.
 SV_states = [svToStateNumber(2:end, :); svToStateNumber(1, :)];
 %node = 1, node = last are special nodes - shift all others by 1 and use

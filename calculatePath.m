@@ -1,4 +1,4 @@
-function [power, heat, cost] = CalculatePath(path, power_map, heat_map, g, SV_states)
+function [power, heat, cost] = calculatePath(path, power_map, heat_map, g, SV_states)
 
 cost = 0;
 l = length(path);

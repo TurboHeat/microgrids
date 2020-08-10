@@ -1,5 +1,5 @@
 %--------------------------------------------------------------%
-% File: condensed_state_representation.m (function)
+% File: condensedStateRepresentation.m (function)
 % Author: Iliya/Miguel
 % Date 18/08/16
 % v1.0
