@@ -13,7 +13,7 @@
 
 %% Load the turbine data - dynamics graph, costs, etc.
 close all; clearvars; clc;
-addpath(genpath('C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data'));
+addpath(genpath('..\Data'));
 load graph_data_all_days.mat ;
 
 % Make sure that key parameters are defined
@@ -45,7 +45,7 @@ n_MGTs = 4; %number of Multi-Gas Turbines.
 t_plot = (1:n_lines * end_time)' ./ n_lines; %time vector for plotting graphs.
 %If and where to save the graphs
 save_fig = 1;
-savepath = 'C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data\Case_Study_Images\WithSale\';
+savepath = '..\Data\Case_Study_Images\WithSale\';
 
 FontSize = 20; %Font Size
 
@@ -224,7 +224,7 @@ disp(['All data saved to folder ', savepath]);
 %t_path=[path.', circshift(path,1,2).'];
 
 %% Save economic data
-savepath = 'C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data\\WithSale';
+savepath = '..\Data\\WithSale';
 save([savepath, 'econ_data.mat'], 'elec_tariff', 'heat_tariff', ...
   'power_demand', 'heat_demand', 'power_MGTs', 'heat_MGTs', 'MGT_cost', ...
   'electric_energy_kWh', 'heat_energy_kWh', 'base_electricity_charge', ...

@@ -1,5 +1,3 @@
-
-
 %--------------------------------------------------------------%
 % File: condensed_state_representation.m (function)
 % Author: Iliya/Miguel
@@ -12,7 +10,7 @@
 clearvars;
 close all;
 clc
-addpath('C:\Users\migueld\Dropbox\Technion Grand Energy Program\Miguel Dias\Data');
+addpath('..\Data');
 load graph24h_newSU.mat 'Transition_t';
 load graph_data_all_days.mat;
 

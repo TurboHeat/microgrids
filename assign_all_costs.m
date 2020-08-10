@@ -14,7 +14,8 @@
 clearvars;
 close all;
 clc;
-addpath(genpath('C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data'));
+savepath = '..\Data\';
+addpath(genpath(savepath));
 
 %%
 show_plot = 0; %boolean to decide if the plots off tariffs and demands are shown
@@ -30,19 +31,8 @@ buildingstring = {'Large Hotel', 'Full Service Restaraunt', 'Small Hotel', 'Resi
 daystring = {'Winter', 'Spring/Autumn', 'Summer'}; %for plotting
 coststring = {'C1', 'C2', 'C3'}; %{C1, C2 C3}=[7.74 8.85 6.80] $/1000ft^3
 
-%% Define save folder
-cname = getenv('computername');
-if strcmp(cname, 'AEJETLAB38') %at uni
-  %     savepath='C:\Users\migueld\Dropbox\Technion Grand Energy Program\Miguel Dias\Data\';
-  %     savepath='C:\Anoop\Anoop_Technion\Research Work\MOE Project\Anoop Jain\Data\';
-  savepath = 'C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data\';
-else %my PC
-  %     savepath='C:\Users\migue\Dropbox\Technion Grand Energy Program\Miguel Dias\Data\';
-  %     savepath='C:\Anoop\Anoop_Technion\Research Work\MOE Project\Anoop Jain\Data\';
-  savepath = 'C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data\';
-end
 
-%% get all tariffs combinations
+%% Get all tariff combinations
 
 %[Building; day]
 tariff_map = uint8([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4; 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]).';

@@ -8,7 +8,7 @@
 % file to yield readable images.
 %--------------------------------------------------------------%
 close all; clearvars; clc;
-addpath(genpath('C:\Users\migueld\Dropbox\Technion Grand Energy Program\Miguel Dias\Data'));
+addpath(genpath('..\Data'));
 load data_for_plotting.mat ;
 savepath = '..\Data\Case_Study_Images_Final_Paper\psfrag\';
 end_time = 24; %end time in h

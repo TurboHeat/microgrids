@@ -14,7 +14,7 @@
 % 4. Residential neighbourhood
 %--------------------------------------------------------------%
 close all; clearvars; clc;
-addpath(genpath('C:\Users\migueld\Dropbox\Technion Grand Energy Program\Miguel Dias\Data'));
+addpath(genpath('..\Data'));
 load econ_data.mat ;
 load graph_data_all_days.mat price_ft3;
 fuel_index = [1 * ones(12, 1); 2 * ones(12, 1); 3 * ones(12, 1)];

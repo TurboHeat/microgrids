@@ -18,13 +18,13 @@ if (exist('decided_costs', 'var'))
   clearvars - except decided_costs;
   close all;
   clc;
-  addpath(genpath('C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data'));
+  addpath(genpath('..\Data'));
   load('graph_data_all_days.mat', '-regexp', '[^decided_costs]');
 else
   clearvars;
   close all;
   clc;
-  addpath(genpath('C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data'));
+  addpath(genpath('..\Data'));
   load graph_data_all_days.mat;
   decided_costs = double(decided_costs);
 end
@@ -60,7 +60,7 @@ BufferSize = 1; %Find the best solution within BufferSize last iterations.
 t_plot = (1:n_lines * end_time)' ./ n_lines; %time vector for plotting graphs.
 %If and where to save the graphs
 save_fig = 1;
-savepath = 'C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data\Case_Study_Images\';
+savepath = '..\Data\Case_Study_Images\';
 
 FontSize = 20; %Font Size
 
@@ -333,7 +333,7 @@ end
 disp(['All data saved to folder ', savepath]);
 
 %% Save economic data
-savepath = 'C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data\';
+savepath = '..\Data\';
 save([savepath, 'econ_data.mat'], 'elec_tariff', 'heat_tariff', ...
   'power_demand', 'heat_demand', 'power_MGTs', 'heat_MGTs', 'MGT_cost', ...
   'base_electricity_charge', ...

@@ -17,13 +17,13 @@ if (exist('decided_costs', 'var'))
   clearvars - except decided_costs;
   close all;
   clc;
-  addpath(genpath('C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data'));
+  addpath(genpath('..\Data'));
   load('graph_data_all_days.mat', '-regexp', '[^decided_costs]');
 else
   clearvars;
   close all;
   clc;
-  addpath(genpath('C:\GasTurbinesProject\OneDrive_2020-04-27\Energy Project\Data'));
+  addpath(genpath('..\Data'));
   load graph_data_all_days.mat;
   decided_costs = double(decided_costs);
 end
@@ -36,7 +36,7 @@ dt = 15; %in s
 n_lines = 3600 / dt;
 T = end_time * n_lines; %number of time steps
 t_plot = (1:n_lines * end_time)' ./ n_lines;
-savepath = 'C:\Users\migueld\Dropbox\Technion Grand Energy Program\Miguel Dias\Data\Case_Study_Images\';
+savepath = '..\Data\Case_Study_Images\';
 save_fig = 1;
 
 %%
@@ -148,7 +148,7 @@ end
 disp(['All data saved to folder ', savepath]);
 
 %% Save economic data
-savepath = 'C:\Users\migueld\Dropbox\Technion Grand Energy Program\Miguel Dias\Data\';
+savepath = '..\Data';
 save([savepath, 'econ_data.mat'], 'elec_tariff', 'heat_tariff', ...
   'power_demand', 'heat_demand', 'power_MGT', 'heat_MGT', 'MGT_cost', ...
   'electric_energy_kWh', 'heat_energy_kWh', 'base_electricity_charge', ...
