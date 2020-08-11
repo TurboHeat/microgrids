@@ -1,24 +1,24 @@
 %--------------------------------------------------------------%
-% File: assignAllCostsMultiunit.m (script)
+% File: assignAllCostsMultiunit.m
 % Author: Miel Sharf
 % Date 05/08/20
-% v2.0
+% 
 % Description: Run all combinations of days and building to check if the
 % tariffs are beeing correcty applied to all days of operations.
 % Plots all combinations. The tariffs are valid for all seasons.
 % Saves the tariffs and power demand combinations in a mat file, along with
 % a map of the shape (BUILDING, DAY) (columns) and the corresponding linear
-%index in the row.
+% index in the row.
 % Also runs Iliya's mapping to save all needed variables in one file
 %--------------------------------------------------------------%
-clearvars;
-close all;
-clc;
+function [decided_costs] = assignAllCostsMultiunit(showPlot)
+arguments
+  showPlot (1,1) logical = false %boolean to decide if the plots of tariffs and demands are shown
+end
 savepath = '..\Data\';
 addpath(genpath(savepath));
 
 %%
-show_plot = 0; %boolean to decide if the plots off tariffs and demands are shown
 smooth_demand = 1; % decide to perform or not smoothing on the demand data
 smooth_time = 21; %number of steps for smoothing, needs to be odd. 15=3.75min, 21=5.25min
 dt = 15;
@@ -27,16 +27,10 @@ end_time = 24; %in hours
 T = end_time * n_lines; % total number of time steps in a day
 BUILDING = [1, 2, 3, 4];
 DAY      = [1 2 3];
-total_nodes = 46; %smax*(vmax+1)+1
 buildingstring = {'Large Hotel', 'Full Service Restaraunt', 'Small Hotel', 'Residential'}; %for plotting
 daystring = {'Winter', 'Spring/Autumn', 'Summer'}; %for plotting
-coststring = {'C1', 'C2', 'C3'}; %{C1, C2 C3}=[7.74 8.85 6.80] $/1000ft^3
 
-%% Define save folder
-
-
-%% get all tariffs combinations
-
+%% Get all tariff combinations
 %[Building; day]
 tariff_map = uint8([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4; 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]).';
 elec_tariff = zeros(T, numel(BUILDING)*numel(DAY));
@@ -58,8 +52,8 @@ end
 %heat_tariff=0.04; %define heat tariff
 
 %% plotting according to building type
-if show_plot
-  t = [1:n_lines * end_time]' ./ n_lines; % what is it?
+if showPlot
+  t = (1:n_lines * end_time).' ./ n_lines; % what is it?
   %Plot tariffs
   k = 1;
   for i = 1:4 %building
@@ -94,24 +88,25 @@ if show_plot
 end
 
 %% Run Iliya's mapping and save all the variables at once
-load graph_24h.mat 'g' 'svToStateNumber';
+load('graph_24h.mat', 'g', 'svToStateNumber');
 state_from = g.Edges.EndNodes(:, 1);
 state_to = g.Edges.EndNodes(:, 2);
-possible_s = 1:25;
-possible_v = 0:9;
+
 %%%
 total_nodes = length(svToStateNumber); %smax*(vmax+1)+1
 [SV_states, time_from, n_tsteps, from_state_map, to_state_map] = transformAdjacencyMatrix(state_from, state_to, svToStateNumber);
 clear A g;
-load 'sv_mappings'
-if ~exist('power_map')
-  power_map = PowerSurf;
+% Load (and optionally rename) mappings
+% the file may have different contents (!?), so we rename the variables
+load('sv_mappings') %#ok<LOAD>
+if ~exist('power_map', 'var')
+  power_map = PowerSurf; clear PowerSurf
 end
-if ~exist('heat_map')
-  heat_map = PheatSurfExt;
+if ~exist('heat_map', 'var')
+  heat_map = PheatSurfExt; clear PheatSurfExt
 end
-if ~exist('m_dot_f_map')
-  m_dot_f_map = FFSurfExt;
+if ~exist('m_dot_f_map', 'var')
+  m_dot_f_map = FFSurfExt; clear FFSurfExt
 end
 
 %% Natural gas parameter
@@ -144,12 +139,10 @@ sol_select = [~SV_states(from_state_map, 1) & ~SV_states(to_state_map, 1), ... %
 % checks whether an edge corresponds to a change of (s,v). Such transitions
 % will be penalized later in assignCostsMultiunit().
 is_transition = [zeros(total_nodes,1);...
-  ~[SV_states(from_state_map(total_nodes+1:end-total_nodes),1)== SV_states(to_state_map(total_nodes+1:end-total_nodes),1) &... %checks equality of S values
-    SV_states(from_state_map(total_nodes+1:end-total_nodes),2)== SV_states(to_state_map(total_nodes+1:end-total_nodes),2)];
+  ~(SV_states(from_state_map(total_nodes+1:end-total_nodes),1)== SV_states(to_state_map(total_nodes+1:end-total_nodes),1) &... %checks equality of S values
+    SV_states(from_state_map(total_nodes+1:end-total_nodes),2)== SV_states(to_state_map(total_nodes+1:end-total_nodes),2));
     zeros(total_nodes,1)]; %checks equality of V values
 %% Main loop to assign edges
-lambda = zeros(T, 2);
-%call lambda
 k = 1;
 decided_costs = zeros(length(to_state_map), numel(BUILDING)*numel(DAY)*numel(price_kg_f));
 for cost = 1:numel(price_kg_f)
