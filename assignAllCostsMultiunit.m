@@ -93,7 +93,7 @@ state_from = g.Edges.EndNodes(:, 1);
 state_to = g.Edges.EndNodes(:, 2);
 
 %%%
-total_nodes = length(svToStateNumber); %smax*(vmax+1)+1
+total_nodes = size(svToStateNumber, 1); %smax*(vmax+1)+1
 [SV_states, time_from, n_tsteps, from_state_map, to_state_map] = transformAdjacencyMatrix(state_from, state_to, svToStateNumber);
 clear A g;
 % Load (and optionally rename) mappings

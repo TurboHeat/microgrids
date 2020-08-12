@@ -11,20 +11,17 @@
 % document using LaTex.
 %--------------------------------------------------------------%
 %Startup:
+close all;
+clc;
+addpath(genpath('..\Data'));
 % The variable decided_costs takes too much room to be saved normally. If
 % it already exists in the workspace, don't delete it. If it does not
 % exist, load it and convert it to double.
 if (exist('decided_costs', 'var'))
   clearvars('-except', 'decided_costs');
-  close all;
-  clc;
-  addpath(genpath('..\Data'));
   load('graph_data_all_days.mat', '-regexp', '[^decided_costs]');
 else
   clearvars;
-  close all;
-  clc;
-  addpath(genpath('..\Data'));
   load graph_data_all_days.mat;
   decided_costs = double(decided_costs);
 end

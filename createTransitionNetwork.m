@@ -1,4 +1,4 @@
-function g = CreateTransitionNetwork(kwargs)
+function g = createTransitionNetwork(kwargs)
 %--------------------------------------------------------------%
 % TODO:
 % Add source and terminal node.
@@ -12,7 +12,7 @@ arguments % accepted key-value pairs:
   kwargs.vmax(1, 1) uint8 = 9; % maximum bypass valve level (corresponds to 90%)
   kwargs.dt(1, 1) double = 15; % duration of a step [s]
   kwargs.endTime(1, 1) uint16 = 24 * 60; % final time [min]. Default: 24 [h/day] * 60 [min/h]
-  kwargs.savePath(1, 1) string = fullfile(fileparts(mfilename('fullpath')), "Data");
+  kwargs.savePath(1, 1) string = fullfile(fileparts(mfilename('fullpath')), "..\Data");
 end
 
 % Unpack inputs:
