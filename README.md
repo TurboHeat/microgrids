@@ -28,14 +28,22 @@ See also:
 
 **`createTransitionNetwork`** - generates the transition table. Does not need any external data files. The script is divided into several parts:
 
-1. Build a small adjacency matrix, defining all possibile transitions from all states (t,S,V) for a fixed t and S=1,...,s and V = 0,...,v-1.
-2. Replicate the adjacency matrix T times, where T is the number of time instances in the ED problem.
+1. Build a small adjacency matrix, defining all possibile transitions from all states `(t,S,V)` for a fixed `t`, `S=1,...,s` and `V = 0,...,v-1`.
+2. Replicate the adjacency matrix `T` times, where `T` is the number of time instances in the economic dispatch problem.
 3. Add the source and terminal nodes.
 4. Build the graph from the composite adjacency matrix.
-Here, the nodes are indexed as 1,2,3,... Node number 1 is the source node. The next (s*v+1) nodes correspond to time 0. The next (s*v+1) nodes correspond
-to time 1, etc. This continues for a total to T times, culminating in a single terminal node. Inside each layer, the nodes are organized as follows:
-The first node is the 'off' state. The rest are ordered in the following way:
-(1,0),(2,0),...(s,0),(1,1),(2,1),...,(s,1),......,(1,v-1),(2,v-1),...,(s,v-1)
+Here, the nodes are indexed as `1,2,3,...`:
+
+    - Node `1` is the source node. 
+    - The next `(s*v+1)` nodes correspond to time `0`, followed by `(s*v+1)` nodes for time `1`, etc.
+    - This repeats a total of `T` times, culminating in a single terminal node.  
+
+    Inside each layer, the nodes are organized as follows:
+
+    - The first node is the `'off'` state.
+    - The rest are ordered in the following way:
+
+       `(1,0),(2,0),...(s,0),(1,1),(2,1),...,(s,1),......,(1,v-1),(2,v-1),...,(s,v-1)`
 
 - This script does not need to be run every time, only when changes to the structure of the network are required. 
 - All the other scripts use the output of this one, called `graph_24h.mat`.
