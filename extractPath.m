@@ -12,9 +12,6 @@ function [power_MGT, heat_MGT, fuel_MGT] = extractPath(path, power_map, heat_map
 % algorithm
 path_aux = path - 1; %Shift - move source node to index 0.;
 
-path_states = zeros(length(path)-2, 1);
-path_times = zeros(length(path)-2, 1);
-
 path_states = mod(path_aux(2:end-1)-1, length(SV_states));
 path_times = floor((path_aux(2:end-1) - 0.5)/(length(SV_states))) + 1;
 

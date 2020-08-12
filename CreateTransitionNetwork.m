@@ -23,7 +23,7 @@ vmax = kwargs.vmax;
 dt = kwargs.dt;
 endTime = kwargs.endTime;
 savePath = kwargs.savePath;
-if (~exist(savePath))
+if (~exist(savePath, 'dir'))
   mkdir(savePath);
 end
 

@@ -267,7 +267,7 @@ for i = 1:length(fuel_index)
   
   %% Plot
   if (0)
-    h1 = figure(3);
+    h1 = figure(3); %#ok<UNRCH>
     subplot(2, 1, 1);
     plot(t_plot, power_demand(:, d_index)/1e3, t_plot, power_MGT_Total/1e3, ...
       t_plot, (power_demand(:, d_index) - power_MGT_Total)/1e3, 'LineWidth', 2);
@@ -327,7 +327,7 @@ for i = 1:length(fuel_index)
   disp(['Run Number #', int2str(i)]);
   disp(['Power Generation:  ', num2str(power_MGTs{1}(1, i))]);
   disp(['Heat Generation:  ', num2str(heat_MGTs{1}(1, i))]);
-  disp(['--------------------------------']);
+  disp( '--------------------------------' );
 end
 % toc
 disp(['All data saved to folder ', savepath]);

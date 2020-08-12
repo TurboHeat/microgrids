@@ -31,7 +31,6 @@ buildingstring = {'Large Hotel', 'Full Service Restaraunt', 'Small Hotel', 'Resi
 daystring = {'Winter', 'Spring/Autumn', 'Summer'}; %for plotting
 
 %% Get all tariff combinations
-
 %[Building; day]
 tariff_map = uint8([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4; 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]).';
 elec_tariff = zeros(T, numel(BUILDING)*numel(DAY));

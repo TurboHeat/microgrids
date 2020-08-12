@@ -6,8 +6,10 @@ l = length(path);
 for i = 1:(l - 1)
   FromNode = path{i};
   ToNode = path{i+1};
-  Index = find(ismember(g.Edges.EndNodes(:, 1), FromNode) & ismember(g.Edges.EndNodes(:, 2), ToNode));
+  Index = find(ismember(g.Edges.EndNodes(:, 1), FromNode) & ismember(g.Edges.EndNodes(:, 2), ToNode));  
   cost = cost + g.Edges.Weight(Index);
+  % tf = ismember(g.Edges.EndNodes(:, 1), FromNode) & ismember(g.Edges.EndNodes(:, 2), ToNode);
+  % cost = cost + g.Edges.Weight(tf);
 end
 
 %Normalize transition
