@@ -7,6 +7,7 @@ classdef TimestampedStatHolder < handle
     nValues
     
     % Time
+    dt
     timeStart
     timeEnd
     
@@ -18,19 +19,29 @@ classdef TimestampedStatHolder < handle
   
   methods
     function tshObj = TimestampedStatHolder(timeVec, values, kwargs)
-      %% Input checking:
+      %% Input testing:
       arguments
         timeVec (:,1) datetime {mustBeNonempty}
-        values (:,1) double {mustBeNonempty, mustBeNonNan}
+        values (:,:) double {mustBeNonempty, mustBeNonNan}
         kwargs.separateWeekends (1,1) logical = true
-        kwargs.weights (:,1) double = 1
+        kwargs.weights (:,1) double {mustBeNonnegative, mustBeFinite} = ones(numel(timeVec),1)
         kwargs.biasCorrection (1,1) logical = false
         kwargs.friSatWeekend (1,1) logical = false
+        kwargs.allowUnequalTimeIntervals (1,1) logical = false
       end
-      assert( numel(timeVec) == numel (values), 'TimestampedStatHolder:incorrectInputLengths',...
-        'The inputs must have the same number of elements!');
+      assert( numel(timeVec) == size(values,1), 'TimestampedStatHolder:incorrectInputLengths',...
+        'The inputs must have the same number of rows!');
       assert( issorted(timeVec, 'strictascend'), 'TimestampedStatHolder:unsortedTimestamps',...
         'Timestamps must be unique and sorted in increasing order!');
+      dt = diff(timeVec); % this results in an array of durations
+      if kwargs.allowUnequalTimeIntervals
+        tshObj.dt = dt;
+      else
+        assert( numel(unique(dt)) == 1, 'TimestampedStatHolder:unequalTimeSteps',...
+          'Unequal time intervals detected!');
+        tshObj.dt = dt(1);
+      end
+      
       %% Object creation:
       tshObj.nValues = numel(timeVec);
       tshObj.timeStart = timeVec(1);
@@ -39,16 +50,16 @@ classdef TimestampedStatHolder < handle
       if kwargs.separateWeekends
         we = TimestampedStatHolder.isweekend(timeVec, kwargs.friSatWeekend);
         % Mean:
-        tshObj.valMean = [TimestampedStatHolder.weightedMean(values( we), kwargs.weights( we));
-                          TimestampedStatHolder.weightedMean(values(~we), kwargs.weights(~we))];
+        tshObj.valMean = [TimestampedStatHolder.weightedMean(values( we, :), kwargs.weights( we));
+                          TimestampedStatHolder.weightedMean(values(~we, :), kwargs.weights(~we))];
         % Standard deviation:
-        tshObj.valStd = [TimestampedStatHolder.weightedStdev(values( we), kwargs.weights( we), tshObj.valMean(1), kwargs.biasCorrection);
-                         TimestampedStatHolder.weightedStdev(values(~we), kwargs.weights(~we), tshObj.valMean(2), kwargs.biasCorrection)];
+        tshObj.valStd = [TimestampedStatHolder.weightedStdev(values( we, :), kwargs.weights( we), tshObj.valMean(1), kwargs.biasCorrection);
+                         TimestampedStatHolder.weightedStdev(values(~we, :), kwargs.weights(~we), tshObj.valMean(2), kwargs.biasCorrection)];
       else
         % Mean:
-        tshObj.valMean = TimestampedStatHolder.weightedMean(values, kwargs.weights);
+        tshObj.valMean = TimestampedStatHolder.weightedMean(values, :, kwargs.weights);
         % Standard deviation:
-        tshObj.valStd = TimestampedStatHolder.weightedStdev(values, kwargs.weights, tshObj.valMean, kwargs.biasCorrection);
+        tshObj.valStd = TimestampedStatHolder.weightedStdev(values, :, kwargs.weights, tshObj.valMean, kwargs.biasCorrection);
       end
     end % constructor
         
@@ -56,7 +67,7 @@ classdef TimestampedStatHolder < handle
   
   methods (Access = protected, Static = true)    
     function valMean = weightedMean(values, weights)
-      valMean = sum(weights .* values) / sum(weights);
+      valMean = sum(weights .* values, 1) ./ sum(weights);
     end
     
     function valStd = weightedStdev(values, weights, wMean, biasCorrection)
@@ -70,11 +81,11 @@ classdef TimestampedStatHolder < handle
       if biasCorrection
         % Including bias correction:
         n = nnz(weights);
-        valStd = sqrt( sum(weights .* (values - wMean).^2) / ...
+        valStd = sqrt( sum(weights .* (values - wMean).^2, 1) / ...
           ( (n-1)/n * sum(weights)) );
       else
         % No bias correction:
-        valStd = sqrt( sum(weights .* (values - wMean).^2) / ...
+        valStd = sqrt( sum(weights .* (values - wMean).^2, 1) / ...
                       sum(weights));
       end
       
@@ -87,8 +98,7 @@ classdef TimestampedStatHolder < handle
         dtObj (:,:) datetime {mustBeNonempty}
         isWeekendFriSat (1,1) logical = false
       end
-      ucal = struct(dtObj(1)).dateFields;
-      dow = matlab.internal.datetime.getDateFields(dtObj.data,ucal.DAY_OF_WEEK,dtObj.tz);
+      dow = weekday(dtObj);
       if isWeekendFriSat
         tf = (dow == 6) | (dow == 7);
       else % Weekend is Sat-Sun
