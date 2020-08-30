@@ -18,15 +18,16 @@ arguments
   kwargs.smoothDemand (1,1) logical = true; % will smoothing be performed on the demand data?
   kwargs.smoothTime (1,1) double {mustBeInteger, mustBePositive} = 21; % number of steps for smoothing. 15=3.75min, 21=5.25min
   kwargs.endTime (1,1) double {mustBePositive} = 24; % [h]
+  kwargs.savePath (1,1) string = "../Data/"; 
 end
 % Unpack kwargs:
 showPlot = kwargs.showPlot;
 smoothDemand = kwargs.smoothDemand;
 smoothTime = kwargs.smoothTime;
 endTime = kwargs.endTime;
+savePath = kwargs.savePath;
 
 %% Constants
-savepath = '..\Data\';
 SECONDS_PER_MINUTE = 60;
 MINUTES_PER_HOUR = 60;
 SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
@@ -123,13 +124,13 @@ total_nodes = size(svToStateNumber, 1); %(smax-smin)*(vmax-vmin+1)+1
   transformAdjacencyMatrix(state_from, state_to, svToStateNumber);
 clear A g;
 %% Load (and optionally rename) mappings
-if isfile(fullfile(savepath, 'CHP.mat')) % Engine similar to Capstone C65 (incl. extrapolation)
-  tmp = load(fullfile(savepath, 'CHP.mat'));
+if isfile(fullfile(savePath, 'CHP.mat')) % Engine similar to Capstone C65 (incl. extrapolation)
+  tmp = load(fullfile(savePath, 'CHP.mat'));
   power_map = tmp.PowerSurf;
   heat_map = tmp.PheatSurfExt;
   m_dot_f_map = tmp.FFSurfExt;
 else
-  tmp = load(fullfile(savepath, 'sv_mappings.mat')); % "Virtual" engine
+  tmp = load(fullfile(savePath, 'sv_mappings.mat')); % "Virtual" engine
   power_map = tmp.power_map;
   heat_map = tmp.heat_map;
   m_dot_f_map = tmp.m_dot_f_map;
@@ -175,13 +176,13 @@ progressbar(1); % close progressbar
 % This requires ~3.4GB of space!
 aux = decided_costs;
 decided_costs = single(decided_costs);
-save(fullfile(savepath, 'all_data.mat'), 'tariff_map', 'elec_tariff', 'power_demand', ...
+save(fullfile(savePath, 'all_data.mat'), 'tariff_map', 'elec_tariff', 'power_demand', ...
   'heat_demand', 'SV_states', 'time_from', 'n_tsteps', 'heat_tariff', ...
   'from_state_map', 'to_state_map', 'heat_map', 'm_dot_f_map', 'power_map', ...
   'price_kg_f', 'decided_costs', 'state_from', 'state_to', 'sol_select');
 
 %g1=digraph(state_from, state_to, decided_costs(:,1));
-save(fullfile(savepath, 'graph_data_all_days.mat'), '-regexp', '[^aux]');
+save(fullfile(savePath, 'graph_data_all_days.mat'), '-regexp', '[^aux]');
 % Assign output:
 if nargout
   varargout{1} = aux;
