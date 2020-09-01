@@ -10,6 +10,7 @@ classdef TimestampedStatHolder < handle
     dt
     timeStart
     timeEnd
+    hourOfVal = NaN % This property will be populated if hourly data was requested
     
     %% Statistics
     % These will be either 1xN or 2xN depending on whether weekends are treated
@@ -31,6 +32,7 @@ classdef TimestampedStatHolder < handle
         kwargs.biasCorrection (1,1) logical = false
         kwargs.friSatWeekend (1,1) logical = false
         kwargs.allowUnequalTimeIntervals (1,1) logical = false
+        kwargs.hourlyStats (1,1) logical = true
       end
       assert( numel(timeVec) == size(values,1), ...
         'TimestampedStatHolder:incorrectInputLengths',...
@@ -47,6 +49,11 @@ classdef TimestampedStatHolder < handle
           'Unequal time intervals detected!');
         tshObj.dt = dt(1);
       end
+      if kwargs.hourlyStats
+        assert( all(~timeVec.Minute) && all(~timeVec.Second),...
+          'TimestampedStatHolder:unroundedTimestamps', ...
+          'When hourly outputs are requested, input timestamps must correspond to round hours!');
+      end
       
       %% Object creation:
       tshObj.nValues = numel(timeVec);
@@ -55,25 +62,69 @@ classdef TimestampedStatHolder < handle
       
       if kwargs.separateWeekends
         we = TimestampedStatHolder.isweekend(timeVec, kwargs.friSatWeekend);
-        % Mean:
-        tshObj.valMean = [TimestampedStatHolder.weightedMean(values( we, :), kwargs.weights( we));
-                          TimestampedStatHolder.weightedMean(values(~we, :), kwargs.weights(~we))];
-        % Standard deviation:
-        tshObj.valStd = [TimestampedStatHolder.weightedStdev(values( we, :), kwargs.weights( we), tshObj.valMean(1), kwargs.biasCorrection);
-                         TimestampedStatHolder.weightedStdev(values(~we, :), kwargs.weights(~we), tshObj.valMean(2), kwargs.biasCorrection)];
+        if kwargs.hourlyStats
+          [tshObj.valMean, tshObj.valStd, tshObj.hourOfVal] = ...
+            TimestampedStatHolder.hourlyWeightedMeanStd(timeVec(we), values(we, :), kwargs.weights(we));
+        else          
+          % Mean:
+          tshObj.valMean = [TimestampedStatHolder.weightedMean(values( we, :), kwargs.weights( we));
+                            TimestampedStatHolder.weightedMean(values(~we, :), kwargs.weights(~we))];
+          % Standard deviation:
+          tshObj.valStd = [TimestampedStatHolder.weightedStdev(values( we, :), kwargs.weights( we), tshObj.valMean(1), kwargs.biasCorrection);
+                           TimestampedStatHolder.weightedStdev(values(~we, :), kwargs.weights(~we), tshObj.valMean(2), kwargs.biasCorrection)];
+        end
       else
-        % Mean:
+        if kwargs.hourlyStats
+          [tshObj.valMean, tshObj.valStd, tshObj.hourOfVal] = ...
+            TimestampedStatHolder.hourlyWeightedMeanStd(timeVec, values, kwargs.weights);          
+        else
+          % Mean:
           tshObj.valMean = TimestampedStatHolder.weightedMean(values, kwargs.weights);
-        % Standard deviation:
+          % Standard deviation:
           tshObj.valStd = TimestampedStatHolder.weightedStdev(values, kwargs.weights, tshObj.valMean, kwargs.biasCorrection);
+        end
       end
     end % constructor
         
   end % public methods
   
-  methods (Access = protected, Static = true)    
-    function valMean = weightedMean(values, weights)
-      valMean = sum(weights .* values, 1) ./ sum(weights);
+  methods (Access = protected, Static = true)
+    function [meanValsVec, stdValsVec, uh] = hourlyWeightedMeanStd(timestamps, values, weights)
+      % This function produces hourly weighted averages of the provided values
+      % It is assumed that weekends have been included/excluded in advance     
+      h = timestamps.Hour;
+      [g,uh] = findgroups(h);
+      [meanValsVec,stdValsVec] = splitapply(@TimestampedStatHolder.wMeanAndStd, values, weights, g);      
+    end    
+    
+    function [meanValsVec, h] = hourlyWeightedMean(timestamps, values, weights)
+      % This function produces hourly weighted averages of the provided values
+      % It is assumed that weekends have been included/excluded in advance    
+      h = timestamps.Hour;
+      g = findgroups(h);
+      meanValsVec = splitapply(@TimestampedStatHolder.weightedMean, values, weights, g);      
+    end
+    
+    function [stdValsVec, h] = hourlyWeightedStd(timestamps, values, weights)
+      % This function produces hourly weighted standard deviations of the provided values
+      % It is assumed that weekends have been included/excluded in advance   
+      h = timestamps.Hour;
+      g = findgroups(h);
+      stdValsVec = splitapply(@TimestampedStatHolder.weightedStdev, values, weights, g);      
+    end
+    
+    function [meanOfVals, stdOfVals] = wMeanAndStd(values, weights, biasCorrection)
+      % This function produces both the weighted averages and standard deviations of the provided values
+      % It is assumed that weekends have been included/excluded in advance      
+      if nargin < 3
+        biasCorrection = false;
+      end
+      meanOfVals = TimestampedStatHolder.weightedMean(values, weights);
+      stdOfVals = TimestampedStatHolder.weightedStdev(values, weights, meanOfVals, biasCorrection);      
+    end
+    
+    function meanOfVals = weightedMean(values, weights)
+      meanOfVals = sum(weights .* values, 1) ./ sum(weights);
     end
     
     function stdOfVals = weightedStdev(values, weights, wMean, biasCorrection)
