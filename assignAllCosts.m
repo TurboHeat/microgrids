@@ -32,7 +32,7 @@ SECONDS_PER_MINUTE = 60;
 MINUTES_PER_HOUR = 60;
 SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
 
-% Natural gas parameter
+% Natural gas parameters
 Qr = 49736500;   % [J/kg]
 h_env = 3.015e5; % [J/kg]
 h_100 = 3.9748e5;% [J/kg]

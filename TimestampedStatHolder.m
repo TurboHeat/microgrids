@@ -3,15 +3,18 @@ classdef TimestampedStatHolder < handle
   % This class stores only a summary of the data and not individual values.
   
   properties (GetAccess = public, SetAccess = immutable)
-    % General
+    %% General
     nValues
     
-    % Time
+    %% Time
     dt
     timeStart
     timeEnd
     
-    % Statistics
+    %% Statistics
+    % These will be either 1xN or 2xN depending on whether weekends are treated
+    % separately, where N is the number of quantities being processed (typically 1 or 2,
+    % for power and/or heat)
     valMean
     valStd
     % etc ...
@@ -29,15 +32,18 @@ classdef TimestampedStatHolder < handle
         kwargs.friSatWeekend (1,1) logical = false
         kwargs.allowUnequalTimeIntervals (1,1) logical = false
       end
-      assert( numel(timeVec) == size(values,1), 'TimestampedStatHolder:incorrectInputLengths',...
+      assert( numel(timeVec) == size(values,1), ...
+        'TimestampedStatHolder:incorrectInputLengths',...
         'The inputs must have the same number of rows!');
-      assert( issorted(timeVec, 'strictascend'), 'TimestampedStatHolder:unsortedTimestamps',...
+      assert( issorted(timeVec, 'strictascend'), ...
+        'TimestampedStatHolder:unsortedTimestamps',...
         'Timestamps must be unique and sorted in increasing order!');
       dt = diff(timeVec); % this results in an array of durations
       if kwargs.allowUnequalTimeIntervals
         tshObj.dt = dt;
       else
-        assert( numel(unique(dt)) == 1, 'TimestampedStatHolder:unequalTimeSteps',...
+        assert( numel(unique(dt)) == 1, ...
+          'TimestampedStatHolder:unequalTimeSteps',...
           'Unequal time intervals detected!');
         tshObj.dt = dt(1);
       end
@@ -57,9 +63,9 @@ classdef TimestampedStatHolder < handle
                          TimestampedStatHolder.weightedStdev(values(~we, :), kwargs.weights(~we), tshObj.valMean(2), kwargs.biasCorrection)];
       else
         % Mean:
-        tshObj.valMean = TimestampedStatHolder.weightedMean(values, :, kwargs.weights);
+          tshObj.valMean = TimestampedStatHolder.weightedMean(values, kwargs.weights);
         % Standard deviation:
-        tshObj.valStd = TimestampedStatHolder.weightedStdev(values, :, kwargs.weights, tshObj.valMean, kwargs.biasCorrection);
+          tshObj.valStd = TimestampedStatHolder.weightedStdev(values, kwargs.weights, tshObj.valMean, kwargs.biasCorrection);
       end
     end % constructor
         
@@ -70,7 +76,7 @@ classdef TimestampedStatHolder < handle
       valMean = sum(weights .* values, 1) ./ sum(weights);
     end
     
-    function valStd = weightedStdev(values, weights, wMean, biasCorrection)
+    function stdOfVals = weightedStdev(values, weights, wMean, biasCorrection)
       % https://www.itl.nist.gov/div898/software/dataplot/refman2/ch2/weightsd.pdf
       if nargin < 4
         biasCorrection = false;
@@ -81,14 +87,13 @@ classdef TimestampedStatHolder < handle
       if biasCorrection
         % Including bias correction:
         n = nnz(weights);
-        valStd = sqrt( sum(weights .* (values - wMean).^2, 1) / ...
+        stdOfVals = sqrt( sum(weights .* (values - wMean).^2, 1) / ...
           ( (n-1)/n * sum(weights)) );
       else
         % No bias correction:
-        valStd = sqrt( sum(weights .* (values - wMean).^2, 1) / ...
+        stdOfVals = sqrt( sum(weights .* (values - wMean).^2, 1) / ...
                       sum(weights));
-      end
-      
+      end      
     end
     
     function tf = isweekend(dtObj, isWeekendFriSat)
