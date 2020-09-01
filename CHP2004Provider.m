@@ -68,8 +68,9 @@ classdef CHP2004Provider < ConsumptionDataProvider
     function tshObjNew = next(cdpObj)
       % Retrieve data:
       idx = cdpObj.currentWindowPosition : cdpObj.currentWindowPosition + cdpObj.observationWindow;
-      tshObjNew = TimestampedStatHolder(cdpObj.timestamps(idx), cdpObj.data(idx,:));
-      % Advance cursor:
+      tshObjNew = TimestampedStatHolder(cdpObj.timestamps(idx), cdpObj.data(idx,:),...
+        'separateWeekends', true, 'hourlyStats', true, 'weights', ones(numel(idx),1), ...
+        'biasCorrection', false, 'friSatWeekend', false, 'allowUnequalTimeIntervals', false);
       % NOTE/TODO: while it is more efficient to update the statistic values instead of
       % recomputing them (e.g., updating the mean involves subtracting from the known mean
       % the values no longer needed multiplied by their weights and adding the new values
@@ -77,6 +78,7 @@ classdef CHP2004Provider < ConsumptionDataProvider
       % means spanning many values), it requires storing additional information in the 
       % TimestampedStatHolder class.
       
+      % Advance cursor by a day:
       cdpObj.currentWindowPosition = cdpObj.currentWindowPosition + CHP2004Provider.DATAPOINTS_PER_DAY;
     end
 
