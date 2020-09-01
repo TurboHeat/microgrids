@@ -50,11 +50,18 @@ classdef CHP2004Provider < ConsumptionDataProvider
                      'InputFormat', 'yyyy/MM/dd  HH:mm:ss');
       isMidnight = tmp.Minute == 59;
       tmp(isMidnight) = tmp(isMidnight) + duration([0 1 0]); % add a minute
+      
+      % Add the first midnight
+      time0 = datetime(CHP2004Provider.YEAR, 1, 1, 0, 0, 0);
+      data0 = cdp.data(end,:); % data is "periodic"
+      
       % Add Feb 29th (Sunday) as an average of the previous and next and Sundays
       time29 = datetime(CHP2004Provider.YEAR, 2, 29, 1:24, 0, 0).';
       data29 = 0.5 * (cdp.data(1249:1272,:) + cdp.data(1561:1584,:));      
-      cdp.timestamps = [tmp(1:1416); time29; tmp(1417:end)];
+      
       % Build final time/data matrices
+      cdp.timestamps = [time0; tmp(1:1416); time29; tmp(1417:end)];
+      cdp.data = [data0; cdp.data(1:1416,:); data29; cdp.data(1417:end,:)];
     end
 
     % TODO: test OR try/catch OR circshift to make sure we're not trying to access invalid indices
