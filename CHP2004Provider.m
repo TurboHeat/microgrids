@@ -7,11 +7,22 @@ classdef CHP2004Provider < ConsumptionDataProvider
   % Calling example:
   %{
   chp = CHP2004Provider("E:\RefBldgHospitalNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", ...
-                        'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY);
+                        'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY);  
+  t = chp.next();
+  figure(); 
+  yyaxis left; errorbar(t.hourOfVal, t.valMean(:,1), t.valStd(:,1),'DisplayName', 'Power'); 
+  ylabel('Electric Power Consumption [kW]')
+  yyaxis right; errorbar(t.hourOfVal, t.valMean(:,2), t.valStd(:,2),'DisplayName', 'Heat');
+  ylabel('Heating & Cooling Consumption [kW]')
+  xlim([0 24]); xticks(0:2:24); grid('on');
+  title("Average hourly consumption in the range " + char(t.timeStart, "[dd/MM/yyyy") + char(t.timeEnd, "–dd/MM/yyyy)"));   
+  
+  chp_month = CHP2004Provider("E:\RefBldgHospitalNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", ...
+                        'windowSize', 2*CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY);  
   %}
   properties (Access = public, Constant = true)
     DEFAULT_WINDOW = 14 % [days]
-    DATAPOINTS_PER_DAY  = 25; % midnight on both sides is used
+    DATAPOINTS_PER_DAY  = 24; % This is a property of the raw data.
   end
   
   properties (Access = private, Constant = true)
@@ -65,12 +76,14 @@ classdef CHP2004Provider < ConsumptionDataProvider
     end
 
     % TODO: test OR try/catch OR circshift to make sure we're not trying to access invalid indices
+    % (idx may overflow "next").
     function tshObjNew = next(cdpObj)
       % Retrieve data:
       idx = cdpObj.currentWindowPosition : cdpObj.currentWindowPosition + cdpObj.observationWindow;
       tshObjNew = TimestampedStatHolder(cdpObj.timestamps(idx), cdpObj.data(idx,:),...
         'separateWeekends', true, 'hourlyStats', true, 'weights', ones(numel(idx),1), ...
-        'biasCorrection', false, 'friSatWeekend', false, 'allowUnequalTimeIntervals', false);
+        'biasCorrection', false, 'friSatWeekend', false, 'periodicOutput', true, ...
+        'allowUnequalTimeIntervals', false);
       % NOTE/TODO: while it is more efficient to update the statistic values instead of
       % recomputing them (e.g., updating the mean involves subtracting from the known mean
       % the values no longer needed multiplied by their weights and adding the new values

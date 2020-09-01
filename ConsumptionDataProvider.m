@@ -8,7 +8,8 @@ classdef (Abstract) ConsumptionDataProvider < handle
   
   methods (Access = public, Abstract = true)
     % The NEXT method provides a StatHolder object that is "next after" tshObjOld in some sense.
-    % Whenever the method is called, lastCdp is updated.
+    % It is up to the implementation to test whether a "next" output is possible, and act
+    % accordingly if not.
     tshObjNew = next(cdpObj)
   end
 

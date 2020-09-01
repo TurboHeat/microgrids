@@ -33,6 +33,7 @@ classdef TimestampedStatHolder < handle
         kwargs.friSatWeekend (1,1) logical = false
         kwargs.allowUnequalTimeIntervals (1,1) logical = false
         kwargs.hourlyStats (1,1) logical = true
+        kwargs.periodicOutput (1,1) logical = false
       end
       assert( numel(timeVec) == size(values,1), ...
         'TimestampedStatHolder:incorrectInputLengths',...
@@ -83,6 +84,12 @@ classdef TimestampedStatHolder < handle
           % Standard deviation:
           tshObj.valStd = TimestampedStatHolder.weightedStdev(values, kwargs.weights, tshObj.valMean, kwargs.biasCorrection);
         end
+      end
+      
+      if kwargs.periodicOutput
+        tshObj.valMean = tshObj.valMean([1:end,1],:);
+        tshObj.valStd = tshObj.valStd([1:end,1],:);
+        tshObj.hourOfVal(end+1) = 24;
       end
     end % constructor
         
