@@ -11,6 +11,9 @@ classdef (Abstract) ConsumptionDataProvider < handle
     % It is up to the implementation to test whether a "next" output is possible, and act
     % accordingly if not.
     tshObjNew = next(cdpObj)
+    
+    % The HASNEXT method returns a logical indicating whether a "next" entry exists.
+    tf = hasNext(cdpObj)
   end
 
 end

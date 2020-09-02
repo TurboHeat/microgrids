@@ -32,6 +32,8 @@ classdef CHP2004Provider < ConsumptionDataProvider
   
   properties (GetAccess = public, SetAccess = immutable)
     observationWindow (1,1) double {mustBeInteger, mustBePositive} = CHP2004Provider.DEFAULT_WINDOW;
+    nTimeSteps (1,1) double {mustBeInteger, mustBePositive} = realmax();
+    nQuantities (1,1) double {mustBeInteger, mustBePositive} = 1;
   end
   
   properties (Access = private)
@@ -51,8 +53,10 @@ classdef CHP2004Provider < ConsumptionDataProvider
       io = detectImportOptions(csvFullPath);
       io.SelectedVariableNames = io.SelectedVariableNames([1,12:14]);
       io.PreserveVariableNames = true;
+      
       % Import:
       rawData = readtable(csvFullPath, io);
+      
       % Process data:
       cdp.data = [rawData{:,2}, rawData{:,3} + CHP2004Provider.COP * rawData{:,4}];
       
@@ -73,10 +77,12 @@ classdef CHP2004Provider < ConsumptionDataProvider
       % Build final time/data matrices
       cdp.timestamps = [time0; tmp(1:1416); time29; tmp(1417:end)];
       cdp.data = [data0; cdp.data(1:1416,:); data29; cdp.data(1417:end,:)];
+      
+      % Store some information about the data
+      cdp.nTimeSteps = numel(cdp.timestamps);
+      cdp.nQuantities = size(cdp.data, 2);
     end
 
-    % TODO: test OR try/catch OR circshift to make sure we're not trying to access invalid indices
-    % (idx may overflow "next").
     function tshObjNew = next(cdpObj)
       % Retrieve data:
       idx = cdpObj.currentWindowPosition : cdpObj.currentWindowPosition + cdpObj.observationWindow;
@@ -94,7 +100,14 @@ classdef CHP2004Provider < ConsumptionDataProvider
       % Advance cursor by a day:
       cdpObj.currentWindowPosition = cdpObj.currentWindowPosition + CHP2004Provider.DATAPOINTS_PER_DAY;
     end
-
+    
+    function tf = hasNext(cdpObj)
+      % This function determines whether a call to next() will succeed. 
+      % Can be used as a condition in a while loop that calls next() repeatedly.
+      % Alternatively, one may perform a test such as:
+      %   assert( hasNext(cdpObj), 'next:noMoreData', 'End of dataset reached!')
+      tf = cdpObj.currentWindowPosition + cdpObj.observationWindow <= cdpObj.nTimeSteps;
+    end
   end          
   
 end % classdef
