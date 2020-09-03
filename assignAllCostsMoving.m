@@ -1,16 +1,3 @@
-%--------------------------------------------------------------%
-% File: assignAllCosts.m
-% Author: Miel Sharf
-% Date 05/08/20
-%
-% Description: Run all combinations of days and building to check if the
-% tariffs are beeing correcty applied to all days of operations.
-% Plots all combinations. The tariffs are valid for all seasons.
-% Saves the tariffs and power demand combinations in a mat file, along with
-% a map of the shape (BUILDING, DAY) (columns) and the corresponding linear
-% index in the row.
-% Also runs Iliya's mapping to save all needed variables in one file.
-%--------------------------------------------------------------%
 function [varargout] = assignAllCostsMoving(kwargs)
 %% Handle inputs
 arguments
@@ -59,8 +46,9 @@ daystring = {'Winter', 'Spring/Autumn', 'Summer'}; %for plotting
 
 %% Get all tariff combinations
 %[Building; day]
-tariff_map = uint8([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4; 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]).';
+tariff_map = uint8(sortrows(combvec(1:4, 1:3).').'); % sortrows might be unnecessary
 elec_tariff = zeros(T, numel(BUILDING)*numel(DAY));
+% TODO: the demands will be provided using a CHP2004Provider object
 power_demand = zeros(T, numel(BUILDING)*numel(DAY));
 heat_demand = zeros(T, numel(BUILDING)*numel(DAY));
 q = 1;
