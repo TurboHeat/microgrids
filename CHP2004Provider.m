@@ -51,14 +51,15 @@ classdef CHP2004Provider < ConsumptionDataProvider
       cdp.observationWindow = kwargs.windowSize;
       % Set import up:
       io = detectImportOptions(csvFullPath);
-      io.SelectedVariableNames = io.SelectedVariableNames([1,12:14]);
+      io.SelectedVariableNames = io.SelectedVariableNames([1:4,6:8,10]);
       io.PreserveVariableNames = true;
       
       % Import:
       rawData = readtable(csvFullPath, io);
       
       % Process data:
-      cdp.data = [rawData{:,2}, rawData{:,3} + CHP2004Provider.COP * rawData{:,4}];
+      cdp.data = [sum(rawData{:,[2,3,5,6]},2),... Power: Electricity:Facility + Fans:Electricity + InteriorLights:Electricity + InteriorEquipment:Electricity
+        diff(rawData{:,[8,7]},1,2) + rawData{:,4} / CHP2004Provider.COP]; % Heat: Gas:Facility - InteriorEquipment:Gas + Cooling:Electricity / 0.7
       
       % Fix midnights (because 24:00 is considered ambiguous by MATLAB)
       tmp = datetime(strrep(CHP2004Provider.YEAR + "/" + rawData{:,1}, "24:00", "23:59"),...
