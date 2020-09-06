@@ -8,11 +8,10 @@
 % Costs only model fuel costs for the turbines - the demand is dealt with
 % later.
 %--------------------------------------------------------------%
-function [decided_costs] = assignCostsMultiunit(dt, fuel_map, mdot_fuel_SU, total_nodes, sol_select, n_tsteps, from_state_map, to_state_map, price_kg_f, is_transition)
+function [decided_costs] = assignCostsMultiunit(dt, fuel_map, mdot_fuel_SU, total_nodes, sol_select, n_tsteps, from_state_map, to_state_map, price_kg_f, transition_penalty_indicator,transition_penalty)
 
 %% Definitions:
 Startup_cost = 3.75; % SU and SD consts are the same
-Transition_Penalty = 0; %0.01; % Higher costs for transitions.
 Weight1 = 1;
 Weight2 = 1;
 
@@ -55,5 +54,5 @@ final_cost(:, 2:3) = bsxfun(@plus, final_cost(:, 2:3), SU_SD_penalties);
 decided_costs = final_cost(sub2ind(size(final_cost), ...
   1:size(final_cost, 1), ...
   sol_select.') ...
-  ).' +Transition_Penalty * is_transition;
+  ).' + transition_penalty*transition_penalty_indicator;
 % decided_costs_1 = 0.01*transition_penalty;

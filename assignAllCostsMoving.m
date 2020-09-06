@@ -6,6 +6,7 @@ arguments
   kwargs.smoothTime (1,1) double {mustBeInteger, mustBePositive} = 21; % number of steps for smoothing. 15=3.75min, 21=5.25min
   kwargs.endTime (1,1) double {mustBePositive} = 24; % [h]
   kwargs.savePath (1,1) string = "../Data/"; 
+  kwargs.transitionPenalty (1,1) double = 0.01;
 end
 % Unpack kwargs:
 showPlot = kwargs.showPlot;
@@ -13,6 +14,7 @@ smoothDemand = kwargs.smoothDemand;
 smoothTime = kwargs.smoothTime;
 endTime = kwargs.endTime;
 savePath = kwargs.savePath;
+transitionPenalty = kwargs.transitionPenalty;
 
 %% Constants
 SECONDS_PER_MINUTE = 60;
@@ -139,7 +141,7 @@ sol_select = [~SV_states(from_state_map, 1) & ~SV_states(to_state_map, 1), ... %
   true(numel(n_tsteps), 1)];% Remaining transitions
 [~, sol_select] = max(sol_select, [], 2);
 % assigns a small penalty to every input (s,v) change
-transition_penalty = [zeros(total_nodes, 1); ...
+transition_penalty_indicator = [zeros(total_nodes, 1); ...
   ~(SV_states(from_state_map(total_nodes+1:end-total_nodes), 1) == SV_states(to_state_map(total_nodes+1:end-total_nodes), 1) & ... %checks equality of S values
     SV_states(from_state_map(total_nodes+1:end-total_nodes), 2) == SV_states(to_state_map(total_nodes+1:end-total_nodes), 2));
    zeros(total_nodes,1)]; %checks equality of V values
@@ -157,7 +159,7 @@ for cost = 1:nPrices % this takes ~4min
       from_state_map, to_state_map,...
       power_demand.mean(:,q) + alpha * power_demand.std(:,q),...
       heat_demand.mean(:,q) + alpha * heat_demand.std(:,q), ...
-      elec_tariff(:, q), heat_tariff(cost), fuel_price, transition_penalty);
+      elec_tariff(:, q), heat_tariff(cost), fuel_price, transition_penalty_indicator,transitionPenalty);
     k = k + 1;
     progressbar([], q/nConfigs);
   end
