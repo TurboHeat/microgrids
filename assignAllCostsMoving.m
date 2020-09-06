@@ -5,8 +5,9 @@ arguments
   kwargs.smoothDemand (1,1) logical = true; % will smoothing be performed on the demand data?
   kwargs.smoothTime (1,1) double {mustBeInteger, mustBePositive} = 21; % number of steps for smoothing. 15=3.75min, 21=5.25min
   kwargs.endTime (1,1) double {mustBePositive} = 24; % [h]
-  kwargs.savePath (1,1) string = "../Data/"; 
+  kwargs.savePath (1,1) string = "../Data/";
   kwargs.transitionPenalty (1,1) double = 0.01;
+  kwargs.demandStandardEnvelope (1,1) double {mustBeNonnegative} = 0; % 
 end
 % Unpack kwargs:
 showPlot = kwargs.showPlot;
@@ -15,6 +16,7 @@ smoothTime = kwargs.smoothTime;
 endTime = kwargs.endTime;
 savePath = kwargs.savePath;
 transitionPenalty = kwargs.transitionPenalty;
+alpha = kwargs.demandStandardEnvelope;
 
 %% Constants
 SECONDS_PER_MINUTE = 60;
@@ -22,6 +24,7 @@ MINUTES_PER_HOUR = 60;
 SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
 
 % Natural gas parameters
+% TODO: move this into a subfunction
 Qr = 49736500;   % [J/kg]
 h_env = 3.015e5; % [J/kg]
 h_100 = 3.9748e5;% [J/kg]
