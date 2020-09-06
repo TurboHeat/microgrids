@@ -24,30 +24,17 @@ MINUTES_PER_HOUR = 60;
 SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
 
 % Natural gas parameters
-% TODO: move this into a subfunction
-Qr = 49736500;   % [J/kg]
-h_env = 3.015e5; % [J/kg]
-h_100 = 3.9748e5;% [J/kg]
-eta_HRU = 0.89;
-eta_b = 0.98;
-mair_mf = 17.2 * 1.2;
-Ph_mf = eta_HRU * (mair_mf + 1) * ((Qr * eta_b + mair_mf * h_env) / (mair_mf + 1) - h_100) / 3.6e6; %kWh/kg
-price_ft3 = [7.74, 8.85, 6.80]; % $/1000ft^3
-density_CH4 = 0.68; % kg/m^3
-ft3_m3 = power(0.3048, 3);
-price_m3 = price_ft3 ./ (1000 * ft3_m3); %price in $/m^3
-price_kg_f = price_m3 / density_CH4; % for MGT costs
-price_kWh = price_kg_f / Ph_mf; % price in $/kWh, for heat tariff
-heat_tariff = price_kWh;
+[PRICE_kg_f, HEAT_TARIFF] = NATURAL_GAS_PARAMS();
 
-%
+% Time-related definitions
 dt = 15; % duration of time step in [s]
-n_lines = SECONDS_PER_HOUR / dt; % number of time steps in 1h
-T = endTime * n_lines; % total number of time steps
+N_LINES = SECONDS_PER_HOUR / dt; % number of time steps in 1h
+T = endTime * N_LINES; % total number of time steps
+
 BUILDING = [1, 2, 3, 4];
 DAY      = [1, 2, 3];
-buildingstring = {'Large Hotel', 'Full Service Restaraunt', 'Small Hotel', 'Residential'}; %for plotting
-daystring = {'Winter', 'Spring/Autumn', 'Summer'}; %for plotting
+BLDG_DESCR = {'Large Hotel', 'Full Service Restaraunt', 'Small Hotel', 'Residential'}; %for plotting
+EXAMPLE_DAY_DESCR = {'Winter', 'Spring/Autumn', 'Summer'}; %for plotting
 
 %% Get all tariff combinations
 %[Building; day]
@@ -72,16 +59,16 @@ end
 
 %% plotting according to building type
 if showPlot
-  t = (1:n_lines * endTime).' ./ n_lines; % what is it?
+  t = (1:N_LINES * endTime).' ./ N_LINES; % what is it?
   %Plot tariffs
   k = 1;
   for q = 1:4 %building
     figure(q);
-    suptitle([buildingstring{q}; {''}; {''}]); %empty chars to get correct spacing
+    suptitle([BLDG_DESCR{q}; {''}; {''}]); %empty chars to get correct spacing
     for j = 1:3 %day
       subplot(1, 3, j);
       plot(t, elec_tariff(:, k));
-      title(daystring{j});
+      title(EXAMPLE_DAY_DESCR{j});
       xlabel('Time (h)');
       ylabel('Rate($/kWh)')
       k = k + 1;
@@ -92,11 +79,11 @@ if showPlot
   k = 1;
   for q = 1:4 %building
     figure(q+4);
-    suptitle([buildingstring{q}; {''}; {''}]); %empty chars to get correct spacing
+    suptitle([BLDG_DESCR{q}; {''}; {''}]); %empty chars to get correct spacing
     for j = 1:3 %day
       subplot(1, 3, j);
       plot(t, power_demand(:, k), t, heat_demand(:, k));
-      title(daystring{j});
+      title(EXAMPLE_DAY_DESCR{j});
       legend('Power Demand', 'Heat Demand');
       xlabel('Time (h)');
       ylabel('Power(kW)');
@@ -150,19 +137,19 @@ transition_penalty_indicator = [zeros(total_nodes, 1); ...
    zeros(total_nodes,1)]; %checks equality of V values
 %% Main loop to assign edges
 k = 1;
-decided_costs = zeros(length(to_state_map), numel(BUILDING)*numel(DAY)*numel(price_kg_f));
+decided_costs = zeros(length(to_state_map), numel(BUILDING)*numel(DAY)*numel(PRICE_kg_f));
 progressbar('Price levels [kg*f]','Building*day combinations');
-nPrices = numel(price_kg_f);
+nPrices = numel(PRICE_kg_f);
 nConfigs = numel(BUILDING) * numel(DAY);
 for cost = 1:nPrices % this takes ~4min
-  fuel_price = price_kg_f(cost);
+  fuel_price = PRICE_kg_f(cost);
   for q = 1:nConfigs
     decided_costs(:, k) = assignCosts(double(dt), power_map, heat_map, fuel_map, ...
       mdot_fuel_SU, total_nodes, sol_select, time_from, n_tsteps,...
       from_state_map, to_state_map,...
       power_demand.mean(:,q) + alpha * power_demand.std(:,q),...
       heat_demand.mean(:,q) + alpha * heat_demand.std(:,q), ...
-      elec_tariff(:, q), heat_tariff(cost), fuel_price, transition_penalty_indicator,transitionPenalty);
+      elec_tariff(:, q), HEAT_TARIFF(cost), fuel_price, transition_penalty_indicator,transitionPenalty);
     k = k + 1;
     progressbar([], q/nConfigs);
   end
@@ -186,4 +173,28 @@ if nargout
   varargout{1} = aux;
 else
   assignin('base', 'decided_costs', aux);
+end
+
+end
+
+function [price_kg_f, price_kWh] = NATURAL_GAS_PARAMS()
+% This function contains some computations using constants. There is no need to perform
+% them each time, so instead the end result is returned.
+%{
+Qr = 49736500;   % [J/kg]
+h_env = 3.015e5; % [J/kg]
+h_100 = 3.9748e5;% [J/kg]
+eta_HRU = 0.89;
+eta_b = 0.98;
+mair_mf = 17.2 * 1.2;
+Ph_mf = eta_HRU * (mair_mf + 1) * ((Qr * eta_b + mair_mf * h_env) / (mair_mf + 1) - h_100) / 3.6e6; %kWh/kg
+price_ft3 = [7.74, 8.85, 6.80]; % $/1000ft^3
+density_CH4 = 0.68; % kg/m^3
+ft3_m3 = power(0.3048, 3);
+price_m3 = price_ft3 ./ (1000 * ft3_m3); %price in $/m^3
+price_kg_f = price_m3 / density_CH4; % for MGT costs
+price_kWh = price_kg_f / Ph_mf; % price in $/kWh, for heat tariff
+%}
+price_kg_f = [0.401964000624002,0.459610000713491,0.353146667214886];
+price_kWh = [0.0350691841359548,0.0400984857368475,0.0308101359333970];
 end
