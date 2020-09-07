@@ -108,6 +108,41 @@ classdef CHP2004Provider < ConsumptionDataProvider
       %   assert( hasNext(cdpObj), 'next:noMoreData', 'End of dataset reached!')
       tf = cdpObj.currentWindowPosition + cdpObj.observationWindow <= cdpObj.nTimeSteps;
     end
+    
+    function tshObj = fastForward(cdpObj, targetTime, inclusionFlag)
+      % This function updates the observation window position of the current object and
+      % optionally returns a TimestampedStatHolder (if an output was requested).
+      arguments
+        cdpObj (1,1) CHP2004Provider
+        targetTime (1,1) datetime {mustBeNonempty}        
+        % where targetTime will be with respect to the returned timestamps
+        inclusionFlag (1,1) string {mustBeMember(inclusionFlag, ["beforeFirst", "first", "last", "afterLast"])} = "beforeFirst"
+      end
+      
+      ts = cdpObj.timestamps;
+      try
+        switch inclusionFlag
+          case "beforeFirst"
+            cdpObj.currentWindowPosition = find(targetTime < ts, 1, 'first');
+          case "first" % "right before", inclusive
+            cdpObj.currentWindowPosition = find(targetTime <= ts, 1, 'first');
+          case "last" 
+            idx = find(targetTime >= ts, 1, 'last');
+            cdpObj.currentWindowPosition = idx - cdpObj.observationWindow;
+          case "afterLast"
+            idx = find(targetTime > ts, 1, 'last');
+            cdpObj.currentWindowPosition = idx - cdpObj.observationWindow;
+        end
+      catch me
+        throw(addCause(me, MException('fastForward:InvalidWindowPosition',...
+          ['Fast-forwarding failed because the resulting window position is not a positive value. '...
+          'This can happen in the cases of "first" or "last" inclusionFlag (currently: "%s") when '...
+          'the provided targetTime is outside the extreme timestamps of the available data.'], inclusionFlag)));
+      end
+      if nargout > 0 
+        tshObj = cdpObj.next();
+      end
+    end
   end          
   
 end % classdef
