@@ -20,7 +20,7 @@ classdef CHP2004Provider < ConsumptionDataProvider
   chp_month = CHP2004Provider("E:\RefBldgHospitalNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", ...
                         'windowSize', 2*CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY);  
   %}
-  properties (Access = public, Constant = true)
+  properties (Access = public, Constant = true, Hidden = true)
     DEFAULT_WINDOW = 14 % [days]
     DATAPOINTS_PER_DAY  = 24; % This is a property of the raw data.
   end
