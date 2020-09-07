@@ -3,16 +3,16 @@ function [varargout] = assignAllCostsMoving(kwargs)
 arguments
   kwargs.showPlot (1,1) logical = false % will plots of tariffs and demands be shown?
   kwargs.smoothDemand (1,1) logical = true; % will smoothing be performed on the demand data?
-  kwargs.smoothDemandTimestep (1,1) double {mustBeInteger, mustBePositive} = 21; % number of steps for smoothing. 15=3.75min, 21=5.25min
+  kwargs.smoothDemandTimesteps (1,1) double {mustBeInteger, mustBePositive} = 21; % number of steps for smoothing. 15=3.75min, 21=5.25min
   kwargs.endTime (1,1) double {mustBePositive} = 24; % [h]
   kwargs.savePath (1,1) string = "../Data/";
   kwargs.transitionPenalty (1,1) double = 0.01;
-  kwargs.demandStandardEnvelope (1,1) double {mustBeNonnegative} = 0; % 
+  kwargs.demandStandardEnvelope (1,1) double {mustBeNonnegative} = 0; % α in: expectedDemand = μ ± α·σ
 end
 % Unpack kwargs:
 showPlot = kwargs.showPlot;
 smoothDemand = kwargs.smoothDemand;
-smoothTime = kwargs.smoothDemandTimestep;
+smoothTime = kwargs.smoothDemandTimesteps;
 endTime = kwargs.endTime;
 savePath = kwargs.savePath;
 transitionPenalty = kwargs.transitionPenalty;
@@ -35,17 +35,16 @@ BUILDING = [1, 2, 3, 4];
 DAY      = [1, 2, 3];
 BLDG_DESCR = {'Large Hotel', 'Full Service Restaraunt', 'Small Hotel', 'Residential'}; %for plotting
 EXAMPLE_DAY_DESCR = {'Winter', 'Spring/Autumn', 'Summer'}; %for plotting
+[CHP, NUM_WINDOWS] = LOAD_DEMAND_DATASETS();
 
 %% Get all tariff combinations
 %[Building; day]
 tariff_map = uint8(sortrows(combvec(1:4, 1:3).').'); % sortrows might be unnecessary
 elec_tariff = zeros(T, numel(BUILDING)*numel(DAY));
-% TODO: the demands will be provided using a CHP2004Provider object
-power_demand = zeros(T, numel(BUILDING)*numel(DAY));
-heat_demand = zeros(T, numel(BUILDING)*numel(DAY));
+
 q = 1;
-for b = 1:length(BUILDING)
-  for d = 1:length(DAY)
+for b = 1:numel(CHP)
+  for d = 1:NUM_WINDOWS
     elec_tariff(:, q) = createElectricityTariffProfile(b, d, dt);
     [power_demand(:, q), heat_demand(:, q)] = createDemandProfileVector(b, d, dt);
     % SMOOTHING
@@ -197,4 +196,28 @@ price_kWh = price_kg_f / Ph_mf; % price in $/kWh, for heat tariff
 %}
 price_kg_f = [0.401964000624002,0.459610000713491,0.353146667214886];
 price_kWh = [0.0350691841359548,0.0400984857368475,0.0308101359333970];
+end
+
+function [chp, nWindows] = LOAD_DEMAND_DATASETS()
+% The code below creates 2-week averaging windows for the 5 building types, where
+% the first window is [02-Jan-2004 00:00:00, 16-Jan-2004 00:00:00] (because we don't have
+% data from the end of 2003 and we don't want to use the end of 2004 as a substitute).
+%{
+chp = [CHP2004Provider("../Data/RefBldgLargeHotelNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY),...
+       CHP2004Provider("../Data/RefBldgFullServiceRestaurantNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY),...
+       CHP2004Provider("../Data/RefBldgSmallHotelNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY),...
+       CHP2004Provider("../Data/USA_NY_New.York-Central.Park.725033_TMY3_HIGH.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY),...
+       CHP2004Provider("../Data/RefBldgHospitalNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY)];     
+
+startDay = datetime(2004, 1, 16); % skip the first two weeks
+arrayfun(@(x)x.fastForward(startDay, 'last'), chp);
+
+nextCnt = 0; % Should be equal to: 365-14+1 = 352
+while (chp(1).hasNext)
+  nextCnt = nextCnt + 1;
+  [~] = chp(1).next();
+end
+%}
+chp = struct2array(load('../Data/CHP2004.mat', 'chp'));
+nWindows = struct2array(load('../Data/CHP2004.mat', 'nextCnt'));
 end
