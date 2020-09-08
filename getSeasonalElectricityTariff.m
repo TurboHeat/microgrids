@@ -1,4 +1,4 @@
-function [dailyTariffs] = getSeasonalElectricityTariff(buildingType, currentDate, dt)
+function [rate] = getSeasonalElectricityTariff(buildingType, currentDate)
 %getSeasonalElectricityTariff Returns a vector with the electricity
 %tariff for each time step during the considered day, for the requested building. 
 % Based on the createElectricityTariffProfile.m file.
@@ -6,23 +6,15 @@ function [dailyTariffs] = getSeasonalElectricityTariff(buildingType, currentDate
 arguments
   buildingType (1,1) BuildingType {mustBeInteger, mustBeGreaterThanOrEqual(buildingType,1), mustBeLessThanOrEqual(buildingType,5)}
   currentDate (1,1) datetime
-  dt (1,1) double {mustBeInteger, mustBePositive} = 15 % length of time step in [s]
 end
 if buildingType == 5
   buildingType = 1; % If the building is hospital use "commercial tall", which is
 end                 % the same tariff as large hotel (buildingType=1)
-
+persistent RATES
 %% Constants
-SECONDS_PER_MINUTE = 60;
-MINUTES_PER_HOUR = 60;
-SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
-HOURS_PER_DAY = 24;
-RATES = LOAD_TARIFFS();
+if isempty(RATES), RATES = LOAD_TARIFFS(); end
 
-%% Actual computation...
-stepsPerHour = SECONDS_PER_HOUR / dt; %number of lines per hour
-tariffQueryTimes = hours(linspace(0, HOURS_PER_DAY, stepsPerHour*HOURS_PER_DAY+1).'); tariffQueryTimes(end) = [];
-
+%% Determine the relevant rate:
 switch buildingType
   case BuildingType.LargeHotel    
     if day(currentDate) ~= Weekday.Sunday && any(month(currentDate) == 6:9)
@@ -49,7 +41,6 @@ switch buildingType
       end
     end
 end
-dailyTariffs = rate.tariffAtTime(tariffQueryTimes);
 end
 
 function tariffs = LOAD_TARIFFS()
