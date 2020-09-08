@@ -42,19 +42,16 @@ NUM_BUILDINGS = numel(BUILDING);
 elecTariffs = cell(NUM_BUILDINGS, NUM_WINDOWS);
 demands = cell(NUM_BUILDINGS, NUM_WINDOWS);
 
-q = 1;
-for b = 1:numel(CHP)
+parfor b = 1:NUM_BUILDINGS
+  chp = CHP(b);
   for d = 1:NUM_WINDOWS
-    elec_tariff(:, q) = createElectricityTariffProfile(b, d, dt);
-    [power_demand(:, q), heat_demand(:, q)] = createDemandProfileVector(b, d, dt);
-    % SMOOTHING
-    if smoothDemand
-      power_demand(:, q) = smooth(power_demand(:, q), smoothTime); %select appropriate amount of hours
-      heat_demand(:, q) = smooth(heat_demand(:, q), smoothTime);
+    do = chp.next(); demands{b,d} = do; % demand object
+    elecTariffs{b,d} = getSeasonalElectricityTariff(b, do.timeEnd);
     end
-    q = q + 1;
   end
-end
+% Unbox:
+demands = reshape([demands{:}], NUM_BUILDINGS, NUM_WINDOWS).';
+elecTariffs = reshape([elecTariffs{:}], NUM_BUILDINGS, NUM_WINDOWS).';
 
 %% plotting according to building type
 if showPlot
