@@ -56,6 +56,9 @@ elecTariffs = reshape([elecTariffs{:}], NUM_BUILDINGS, NUM_WINDOWS).';
 % Get tariff at each time step:
 [dailyTariffs,tariffQueryTimes] = getDailyTariffs(elecTariffs, dt); %[nTimestepsPerDay, Elec (1), nDays, nBuildings]
 
+% Get demand at each time step:
+upsampledDemands = upsampleDemands(demands, tariffQueryTimes, smoothPeriod); %[nTimestepsPerDay, Elec+Heat (2), nDays, nBuildings, Mean+Std (2)]
+
 %% plotting according to building type
 if showPlot
   t = (1:N_LINES * endTime).' ./ N_LINES; % what is it?
@@ -231,4 +234,48 @@ stepsPerHour = SECONDS_PER_HOUR / dt; %number of lines per hour
 tariffQueryTimes = linspace(0, HOURS_PER_DAY, stepsPerHour*HOURS_PER_DAY+1).'; tariffQueryTimes(end) = [];
 dailyTariffs = cell2mat(shiftdim(...
   arrayfun( @(x)tariffAtTime(x, tariffQueryTimes), hourlyElecTariffs, 'UniformOutput', false), -2));
+end
+
+function usDemand = upsampleDemands(demands, queryToD, smoothingWindowSz)
+arguments
+  demands (:,:) TimestampedStatHolder
+  queryToD (:,1) double
+  smoothingWindowSz (1,1) double {mustBeInteger, mustBeNonnegative}
+end
+% This function returns a 5D array where:
+% Dim1 is the time-of-day
+% Dim2 is either electricity (at index 1) or heat (at index 2)
+% Dim3 is the day-of-year
+% Dim4 is the building type
+% Dim5 is either mean (at index 1) or stdev (at index 2)
+%% Constants:
+COLUMNS_FOR_POWER_DATA = 1;
+COLUMNS_FOR_HEAT_DATA = 1;
+nC = COLUMNS_FOR_POWER_DATA + COLUMNS_FOR_HEAT_DATA;
+%% Input Handling:
+X = demands(1).hourOfVal;
+nT = numel(queryToD);
+[nW, nB] = size(demands); % NUM_WINDOWS, NUM_BUILDINGS
+% Preallocation:
+[meanDemand,stdevDemand] = deal(zeros(nT, nC, nW, nB));
+
+% Interpolation of the means and standard deviations:
+tmpM = cell2mat(reshape({demands.valMean},1,1,nW,nB));
+tmpS = cell2mat(reshape({demands.valStd},1,1,nW,nB));
+for indQ = 1:nC
+  for indD = 1:nW
+    parfor indB = 1:nB
+      meanDemand(:, indQ, indD, indB)  = nakeinterp1(X, tmpM(:,indQ, indD, indB), queryToD);
+      stdevDemand(:, indQ, indD, indB) = nakeinterp1(X, tmpS(:,indQ, indD, indB), queryToD);
+    end
+  end
+end
+
+% Time smoothing (using convolution):
+if smoothingWindowSz > 1
+  convKer = ones(smoothingWindowSz, 1, 1, 1, 1); % The only non-singleton dimension corresponds to time.
+  usDemand = convn(cat(5, meanDemand, stdevDemand), convKer, 'same');
+else
+  usDemand = cat(5, meanDemand, stdevDemand);
+end
 end
