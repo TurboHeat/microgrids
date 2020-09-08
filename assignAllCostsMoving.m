@@ -30,16 +30,17 @@ SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
 N_LINES = SECONDS_PER_HOUR / dt; % number of time steps in 1h
 T = endTime * N_LINES; % total number of time steps
 
-BUILDING = [1, 2, 3, 4];
-DAY      = [1, 2, 3];
+% Buildings
+BUILDING = BuildingType(1:4);
 BLDG_DESCR = {'Large Hotel', 'Full Service Restaraunt', 'Small Hotel', 'Residential'}; %for plotting
-EXAMPLE_DAY_DESCR = {'Winter', 'Spring/Autumn', 'Summer'}; %for plotting
+NUM_BUILDINGS = numel(BUILDING);
+
+% Demands
 [CHP, NUM_WINDOWS] = LOAD_DEMAND_DATASETS();
 
-%% Get all tariff combinations
-%[Building; day]
-tariff_map = uint8(sortrows(combvec(1:4, 1:3).').'); % sortrows might be unnecessary
-elec_tariff = zeros(T, numel(BUILDING)*numel(DAY));
+%% Get all tariff & demand combinations
+elecTariffs = cell(NUM_BUILDINGS, NUM_WINDOWS);
+demands = cell(NUM_BUILDINGS, NUM_WINDOWS);
 
 q = 1;
 for b = 1:numel(CHP)
