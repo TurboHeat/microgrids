@@ -7,6 +7,7 @@ arguments
   kwargs.savePath (1,1) string = "../Data/";
   kwargs.transitionPenalty (1,1) double = 0.01;
   kwargs.demandStandardEnvelope (1,1) double {mustBeNonnegative} = 0; % α in: expectedDemand = μ ± α·σ
+  kwargs.timeStepSize (1,1) double = 15; % duration of time step in [s]
 end
 % Unpack kwargs:
 showPlot = kwargs.showPlot;
@@ -15,6 +16,7 @@ endTime = kwargs.endTime;
 savePath = kwargs.savePath;
 transitionPenalty = kwargs.transitionPenalty;
 alpha = kwargs.demandStandardEnvelope;
+dt = kwargs.timeStepSize; 
 
 %% Constants
 SECONDS_PER_MINUTE = 60;
@@ -25,7 +27,6 @@ SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
 [PRICE_kg_f, HEAT_TARIFF] = NATURAL_GAS_PARAMS();
 
 % Time-related definitions
-dt = 15; % duration of time step in [s]
 N_LINES = SECONDS_PER_HOUR / dt; % number of time steps in 1h
 T = endTime * N_LINES; % total number of time steps
 
