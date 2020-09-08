@@ -53,6 +53,9 @@ parfor b = 1:NUM_BUILDINGS
 demands = reshape([demands{:}], NUM_BUILDINGS, NUM_WINDOWS).';
 elecTariffs = reshape([elecTariffs{:}], NUM_BUILDINGS, NUM_WINDOWS).';
 
+% Get tariff at each time step:
+[dailyTariffs,tariffQueryTimes] = getDailyTariffs(elecTariffs, dt); %[nTimestepsPerDay, Elec (1), nDays, nBuildings]
+
 %% plotting according to building type
 if showPlot
   t = (1:N_LINES * endTime).' ./ N_LINES; % what is it?
@@ -217,4 +220,15 @@ end
 %}
 chp = struct2array(load('../Data/CHP2004.mat', 'chp'));
 nWindows = struct2array(load('../Data/CHP2004.mat', 'nextCnt'));
+end
+
+function [dailyTariffs,tariffQueryTimes] = getDailyTariffs(hourlyElecTariffs, dt)
+SECONDS_PER_MINUTE = 60;
+MINUTES_PER_HOUR = 60;
+SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
+HOURS_PER_DAY = 24;
+stepsPerHour = SECONDS_PER_HOUR / dt; %number of lines per hour
+tariffQueryTimes = linspace(0, HOURS_PER_DAY, stepsPerHour*HOURS_PER_DAY+1).'; tariffQueryTimes(end) = [];
+dailyTariffs = cell2mat(shiftdim(...
+  arrayfun( @(x)tariffAtTime(x, tariffQueryTimes), hourlyElecTariffs, 'UniformOutput', false), -2));
 end
