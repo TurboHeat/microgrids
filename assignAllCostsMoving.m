@@ -1,7 +1,8 @@
 function [varargout] = assignAllCostsMoving(kwargs)
 %% Handle inputs
 arguments
-  kwargs.showPlot (1,1) logical = false % will plots of tariffs and demands be shown?
+  kwargs.showTariffs (1,1) logical = false % will plots of tariffs be shown?
+  kwargs.showDemands (1,1) logical = false % will plots of demands be shown?
   kwargs.smoothDemandTimesteps (1,1) double {mustBeInteger, mustBePositive} = 21; % number of timesteps for smoothing. 1=off
   kwargs.endTime (1,1) double {mustBePositive} = 24; % [h]
   kwargs.savePath (1,1) string = "../Data/";
@@ -10,7 +11,8 @@ arguments
   kwargs.timeStepSize (1,1) double = 15; % duration of time step in [s]
 end
 % Unpack kwargs:
-showPlot = kwargs.showPlot;
+showTariffs = kwargs.showTariffs;
+showDemands = kwargs.showDemands;
 smoothPeriod = kwargs.smoothDemandTimesteps;
 endTime = kwargs.endTime;
 savePath = kwargs.savePath;
@@ -32,7 +34,6 @@ T = endTime * N_LINES; % total number of time steps
 
 % Buildings
 BUILDING = BuildingType(1:4);
-BLDG_DESCR = {'Large Hotel', 'Full Service Restaraunt', 'Small Hotel', 'Residential'}; %for plotting
 NUM_BUILDINGS = numel(BUILDING);
 
 % Demands
@@ -59,40 +60,12 @@ elecTariffs = reshape([elecTariffs{:}], NUM_BUILDINGS, NUM_WINDOWS).';
 % Get demand at each time step:
 upsampledDemands = upsampleDemands(demands, tariffQueryTimes, smoothPeriod); %[nTimestepsPerDay, Elec+Heat (2), nDays, nBuildings, Mean+Std (2)]
 
-%% plotting according to building type
-if showPlot
-  t = (1:N_LINES * endTime).' ./ N_LINES; % what is it?
-  %Plot tariffs
-  k = 1;
-  for q = 1:4 %building
-    figure(q);
-    suptitle([BLDG_DESCR{q}; {''}; {''}]); %empty chars to get correct spacing
-    for j = 1:3 %day
-      subplot(1, 3, j);
-      plot(t, elec_tariff(:, k));
-      title(EXAMPLE_DAY_DESCR{j});
-      xlabel('Time (h)');
-      ylabel('Rate($/kWh)')
-      k = k + 1;
-    end
-    set(gcf, 'Position', get(0, 'Screensize'));
-  end
-  %Plot demands
-  k = 1;
-  for q = 1:4 %building
-    figure(q+4);
-    suptitle([BLDG_DESCR{q}; {''}; {''}]); %empty chars to get correct spacing
-    for j = 1:3 %day
-      subplot(1, 3, j);
-      plot(t, power_demand(:, k), t, heat_demand(:, k));
-      title(EXAMPLE_DAY_DESCR{j});
-      legend('Power Demand', 'Heat Demand');
-      xlabel('Time (h)');
-      ylabel('Power(kW)');
-      k = k + 1;
-    end
-    set(gcf, 'Position', get(0, 'Screensize'));
-  end
+%% Visualizations?
+if showTariffs
+  visualizeTariffs(dailyTariffs, N_LINES);  
+end
+if showDemands
+  visualizeDemands(upsampledDemands);
 end
 
 %% Run Iliya's mapping and save all the variables at once
@@ -278,4 +251,81 @@ if smoothingWindowSz > 1
 else
   usDemand = cat(5, meanDemand, stdevDemand);
 end
+end
+
+function [] = visualizeTariffs(t, stepsPerHour)
+  [nTimestepsPerDay, ~, nDays, nBuildings] = size(t);
+  assert(nBuildings == 4, 'The function is configured to visualize exactly 4 buildings.');
+  %% Preparations    
+  BLDG_DESCR = {'Large Hotel', 'Full Service Restaraunt', 'Small Hotel', 'Residential'};
+  tsId = 1:nTimestepsPerDay;
+  hF = figure();
+  hTL = tiledlayout(hF, 2,2,'TileSpacing','compact');
+  hAx = gobjects(2,2);
+  t1 = permute(t, [3,1,4,2]);
+  %% 3D Version:
+  %{
+  DAYS_IN_TWO_WEEKS = 14;
+  dayId = (1:nDays)+DAYS_IN_TWO_WEEKS;
+  [TT,DD] = meshgrid(tsId/stepsPerHour, dayId);
+  for iB = 1:nBuildings %building
+    hAx(iB) = nexttile(hTL, iB);
+    waterfall(hAx(iB), DD, TT, t1(:,:,iB));
+    title(hAx(iB), BLDG_DESCR{iB});
+  end
+  set(hAx, 'YDir', 'reverse', 'YLim', [0 24], 'YTick', 0:4:24, ...
+           'XLim', [14 366], 'XTick', 14:44:366);
+  xlabel(hAx, 'Day of Year')
+  ylabel(hAx, 'Time of Day [h]');
+  zlabel(hAx, 'Rate [$/kWh]')  
+  %}
+  %% 2D Version:
+  NON_SUMMER_DAY_ID = 1;
+  SUMMER_DAY_ID = 200;
+  for iB = 1:nBuildings %building
+    hAx(iB) = nexttile(hTL, iB);
+    reset(hAx(iB));
+    hL = plot(hAx(iB), ...
+      tsId/stepsPerHour, t1(NON_SUMMER_DAY_ID,:,iB),...
+      tsId/stepsPerHour, t1(SUMMER_DAY_ID,:,iB), '--', 'LineWidth', 2);
+    hL(1).DisplayName = '"Winter" tariff';
+    hL(2).DisplayName = '"Summer" tariff';
+    title(hAx(iB), BLDG_DESCR{iB});
+    legend(hAx(iB), 'Location', 'northwest');
+  end
+  set(hAx, 'XLim', [0 24], 'XTick', 0:2:24, 'FontSize', 16); 
+  grid(hAx,'on');
+  xlabel(hAx, 'Time of Day [h]');
+  ylabel(hAx, 'Rate [$/kWh]');
+end
+
+function [] = visualizeDemands(d, stepsPerHour)
+  [nTimestepsPerDay, ~, nDays, nBuildings,~] = size(d); %[nTimestepsPerDay, Elec+Heat (2), nDays, nBuildings, Mean+Std (2)]
+  assert(nBuildings == 4, 'The function is configured to visualize exactly 4 buildings.');
+  %% Preparations    
+  BLDG_DESCR = {'Large Hotel', 'Full Service Restaraunt', 'Small Hotel', 'Residential'};
+  tsId = 1:nTimestepsPerDay;
+  hF = figure();
+  hTL = tiledlayout(hF, 2, 4, 'TileSpacing', 'compact');
+  hAx = gobjects(2,4);
+  md = permute(d(:,:,:,:,1), [3,1,4,2]);
+  %% 3D Version:
+  DAYS_IN_TWO_WEEKS = 14;
+  dayId = (1:nDays)+DAYS_IN_TWO_WEEKS;
+  [TT,DD] = meshgrid(tsId/stepsPerHour, dayId);
+  for iB = 1:nBuildings %building
+    % Electricity
+    hAx(iB) = nexttile(hTL, iB);
+    waterfall(hAx(iB), DD, TT, md(:,:,iB,1));
+    title(hAx(iB), BLDG_DESCR{iB});
+    % Power
+    hAx(iB+4) = nexttile(hTL, iB+4);
+    waterfall(hAx(iB+4), DD, TT, md(:,:,iB,2));
+  end
+  set(hAx, 'YDir', 'reverse', 'YLim', [0 24], 'YTick', 0:4:24, ...
+           'XLim', [14 366], 'XTick', 14:44:366);
+  xlabel(hAx, 'Day of Year')
+  ylabel(hAx, 'Time of Day [h]');
+  zlabel(hAx(1:4), 'Electric Demand [kWh]')
+  zlabel(hAx(5:8), 'Heat Demand [kWh]')
 end
