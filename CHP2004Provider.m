@@ -47,20 +47,43 @@ classdef CHP2004Provider < ConsumptionDataProvider
         csvFullPath (1,1) string {mustBeNonempty}
         % Window size, in dataset-specific time units, for computation of statistics:
         kwargs.windowSize (1,1) double {mustBeInteger, mustBePositive} = CHP2004Provider.DEFAULT_WINDOW
+        kwargs.isResidential (1,1) logical = ~contains(csvFullPath, "RefBldg");
       end
       cdp.observationWindow = kwargs.windowSize;
+      isRes = kwargs.isResidential;
+      
       % Set import up:
       io = detectImportOptions(csvFullPath);
-      io.SelectedVariableNames = io.SelectedVariableNames([1:4,6:8,10]);
-      io.PreserveVariableNames = true;
+      if isRes
+        io.SelectedVariableNames = io.SelectedVariableNames([1:2,5:14]);
+      else
+        io.SelectedVariableNames = io.SelectedVariableNames([1:4,6:8,10]);
+      end
+      io.PreserveVariableNames = true;      
       
       % Import:
       rawData = readtable(csvFullPath, io);
       
       % Process data:
-      cdp.data = [sum(rawData{:,[2,3,5,6]},2),... Power: Electricity:Facility + Fans:Electricity + InteriorLights:Electricity + InteriorEquipment:Electricity
-        diff(rawData{:,[8,7]},1,2) + rawData{:,4} / CHP2004Provider.COP]; % Heat: Gas:Facility - InteriorEquipment:Gas + Cooling:Electricity / 0.7
-      
+      if isRes
+        %{
+        Power: Electricity:Facility + Electricity:HVAC + Fans:Electricity + 
+               InteriorLights:Electricity + ExteriorLights:Electricity + 
+               Appl:InteriorEquipment + Misc:InteriorEquipment - Cooling:Electricity            
+        Heat:  Heating:Gas + HVACFan:Fans + Water Heater:WaterSystems + Cooling:Electricity / 0.7
+        %}
+        cdp.data = [sum(rawData{:,[2,6:11]},2) - rawData{:,4},... 
+                    sum(rawData{:,[3,5,12]},2) + rawData{:,4} / CHP2004Provider.COP];
+      else
+        %{
+        Power: Electricity:Facility + Fans:Electricity + 
+               InteriorLights:Electricity + InteriorEquipment:Electricity
+        Heat:  Gas:Facility - InteriorEquipment:Gas + Cooling:Electricity / 0.7
+        %}
+        cdp.data = [sum(rawData{:,[2,3,5,6]},2),... 
+        diff(rawData{:,[8,7]},1,2) + rawData{:,4} / CHP2004Provider.COP];
+      end
+
       % Fix midnights (because 24:00 is considered ambiguous by MATLAB)
       tmp = datetime(strrep(CHP2004Provider.YEAR + "/" + rawData{:,1}, "24:00", "23:59"),...
                      'InputFormat', 'yyyy/MM/dd  HH:mm:ss');
