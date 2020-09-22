@@ -48,8 +48,8 @@ parfor b = 1:NUM_BUILDINGS
   for d = 1:NUM_WINDOWS
     do = chp.next(); demands{b,d} = do; % demand object
     elecTariffs{b,d} = getSeasonalElectricityTariff(b, do.timeEnd);
-    end
   end
+end
 % Unbox:
 demands = reshape([demands{:}], NUM_BUILDINGS, NUM_WINDOWS).';
 elecTariffs = reshape([elecTariffs{:}], NUM_BUILDINGS, NUM_WINDOWS).';
@@ -65,11 +65,11 @@ if showTariffs
   visualizeTariffs(dailyTariffs, N_LINES);  
 end
 if showDemands
-  visualizeDemands(upsampledDemands);
+  visualizeDemands(upsampledDemands, N_LINES);
 end
 
 %% Run Iliya's mapping and save all the variables at once
-load('graph_24h.mat', 'g', 'svToStateNumber');
+load('..\Data\graph_24h.mat', 'g', 'svToStateNumber');
 state_from = g.Edges.EndNodes(:,1);
 state_to = g.Edges.EndNodes(:, 2);
 
@@ -111,24 +111,30 @@ transition_penalty_indicator = [zeros(total_nodes, 1); ...
     SV_states(from_state_map(total_nodes+1:end-total_nodes), 2) == SV_states(to_state_map(total_nodes+1:end-total_nodes), 2));
    zeros(total_nodes,1)]; %checks equality of V values
 %% Main loop to assign edges
-k = 1;
-decided_costs = zeros(length(to_state_map), numel(BUILDING)*numel(DAY)*numel(PRICE_kg_f));
-progressbar('Price levels [kg*f]','Building*day combinations');
 nPrices = numel(PRICE_kg_f);
-nConfigs = numel(BUILDING) * numel(DAY);
-for cost = 1:nPrices % this takes ~4min
-  fuel_price = PRICE_kg_f(cost);
-  for q = 1:nConfigs
-    decided_costs(:, k) = assignCosts(double(dt), power_map, heat_map, fuel_map, ...
-      mdot_fuel_SU, total_nodes, sol_select, time_from, n_tsteps,...
-      from_state_map, to_state_map,...
-      power_demand.mean(:,q) + alpha * power_demand.std(:,q),...
-      heat_demand.mean(:,q) + alpha * heat_demand.std(:,q), ...
-      elec_tariff(:, q), HEAT_TARIFF(cost), fuel_price, transition_penalty_indicator,transitionPenalty);
-    k = k + 1;
-    progressbar([], q/nConfigs);
+% decided_costs = zeros(nStates, nPrices, NUM_BUILDINGS, NUM_WINDOWS);
+progressbar('Gas prices', 'Building types', 'Days');
+for iP = 1:nPrices % this takes ~4min
+  fuel_price = PRICE_kg_f(iP);
+  for iB = 1:NUM_BUILDINGS
+    for iW = 1:NUM_WINDOWS
+      d = demands(iW, iB);
+      mPower = d.valMean(:,1);
+      mHeat = d.valMean(:,2);
+      sPower = d.valStd(:,1);
+      sHeat = d.valStd(:,2);
+      decided_costs = assignCosts(...
+        double(dt), power_map, heat_map, fuel_map, ...
+        mdot_fuel_SU, total_nodes, sol_select, time_from, n_tsteps,...
+        from_state_map, to_state_map,...
+        mPower + alpha * sPower, mHeat + alpha * sHeat, ...
+        elecTariffs(:, iW), HEAT_TARIFF(iP), fuel_price, transition_penalty_indicator, transitionPenalty);
+      % TODO: do something with decided_costs, or save a summary
+      progressbar([], [], iW/nConfigs);
+    end
+    progressbar([], iB/NUM_WINDOWS, []);
   end
-  progressbar(cost/nPrices, []);
+  progressbar(iP/nPrices, [], []);
 end
 progressbar(1); % close progressbar
 
@@ -187,12 +193,14 @@ chp = [CHP2004Provider("../Data/RefBldgLargeHotelNew2004_v1.3_7.1_4A_USA_MD_BALT
 
 startDay = datetime(2004, 1, 16); % skip the first two weeks
 arrayfun(@(x)x.fastForward(startDay, 'last'), chp);
-
+% Count how many times "next" can be called:
 nextCnt = 0; % Should be equal to: 365-14+1 = 352
 while (chp(1).hasNext)
   nextCnt = nextCnt + 1;
   [~] = chp(1).next();
 end
+% Rewind again:
+arrayfun(@(x)x.fastForward(startDay, 'last'), chp);
 %}
 chp = struct2array(load('../Data/CHP2004.mat', 'chp'));
 nWindows = struct2array(load('../Data/CHP2004.mat', 'nextCnt'));
