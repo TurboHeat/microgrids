@@ -54,24 +54,23 @@ end
 demands = reshape([demands{:}], NUM_BUILDINGS, NUM_WINDOWS).';
 elecTariffs = reshape([elecTariffs{:}], NUM_BUILDINGS, NUM_WINDOWS).';
 
-% Get tariff at each time step:
-[dailyTariffs,tariffQueryTimes] = getDailyTariffs(elecTariffs, dt); %[nTimestepsPerDay, Elec (1), nDays, nBuildings]
-
-% Get demand at each time step:
-upsampledDemands = upsampleDemands(demands, tariffQueryTimes, smoothPeriod); %[nTimestepsPerDay, Elec+Heat (2), nDays, nBuildings, Mean+Std (2)]
-
 %% Visualizations?
+if showTariffs || showDemands
+  [dailyTariffs,tariffQueryTimes] = getDailyTariffs(elecTariffs, dt); %[nTimestepsPerDay, Elec (1), nDays, nBuildings]
+end
 if showTariffs
+  % Get tariff at each time step:
   visualizeTariffs(dailyTariffs, N_LINES);  
 end
 if showDemands
+  upsampledDemands = upsampleDemands(demands, tariffQueryTimes, smoothPeriod); %[nTimestepsPerDay, Elec+Heat (2), nDays, nBuildings, Mean+Std (2)]
   visualizeDemands(upsampledDemands, N_LINES);
 end
 
 %% Run Iliya's mapping and save all the variables at once
-load('..\Data\graph_24h.mat', 'g', 'svToStateNumber');
+load(fullfile(savePath, 'graph_24h.mat'), 'g', 'svToStateNumber');
 state_from = g.Edges.EndNodes(:,1);
-state_to = g.Edges.EndNodes(:, 2);
+state_to = g.Edges.EndNodes(:,2);
 
 %%%
 total_nodes = size(svToStateNumber, 1); %(smax-smin)*(vmax-vmin+1)+1
@@ -114,7 +113,7 @@ transition_penalty_indicator = [zeros(total_nodes, 1); ...
 nPrices = numel(PRICE_kg_f);
 % decided_costs = zeros(nStates, nPrices, NUM_BUILDINGS, NUM_WINDOWS);
 progressbar('Gas prices', 'Building types', 'Days');
-for iP = 1:nPrices % this takes ~4min
+for iP = 1:nPrices
   fuel_price = PRICE_kg_f(iP);
   for iB = 1:NUM_BUILDINGS
     for iW = 1:NUM_WINDOWS
@@ -128,11 +127,13 @@ for iP = 1:nPrices % this takes ~4min
         mdot_fuel_SU, total_nodes, sol_select, time_from, n_tsteps,...
         from_state_map, to_state_map,...
         mPower + alpha * sPower, mHeat + alpha * sHeat, ...
-        elecTariffs(:, iW), HEAT_TARIFF(iP), fuel_price, transition_penalty_indicator, transitionPenalty);
+        elecTariffs(iW, iB), HEAT_TARIFF(iP), fuel_price, ...
+        transition_penalty_indicator, transitionPenalty, N_LINES);
       % TODO: do something with decided_costs, or save a summary
-      progressbar([], [], iW/nConfigs);
+      progressbar([], [], iW/NUM_WINDOWS);
+      keyboard; % decided_costs isn't being processed in any way!!!
     end
-    progressbar([], iB/NUM_WINDOWS, []);
+    progressbar([], iB/NUM_BUILDINGS, []);
   end
   progressbar(iP/nPrices, [], []);
 end
