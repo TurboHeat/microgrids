@@ -1,6 +1,17 @@
 function [summary] = robustShortestPath(timeStepSize, endTime, kwargs)
 % Analysis of the solution found by the shortestpath solver
 % and comparison to the robust shortest path solvers. 
+
+% Shortestpath solvers are used according to algorithms in the paper [].
+% We look for the path which minimizes the worst-case cost over all
+% possible demand profiles modeled. As the price is higher when the
+% demand is higher, the ``worst-case" considered by the algorithm is
+% achieved when the demand is the maximal possible. For that reason,
+% we only consider the case in which the demand is equal to 
+% "mean + alpha*std", and not the case in which it is equal to
+% "mean - alpha*std".
+
+
 %% Handling inputs:
 arguments
   timeStepSize (1,1) double {mustBePositive} = 15 % length of a timestep in [s]
