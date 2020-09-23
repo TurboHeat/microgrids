@@ -1,4 +1,5 @@
-function [summary] = robustShortestPath(timeStepSize, endTime, kwargs)
+% TODO: Assign outputs!
+function [] = robustShortestPath(timeStepSize, endTime, kwargs)
 % Analysis of the solution found by the shortestpath solver
 % and comparison to the robust shortest path solvers. 
 %
@@ -31,7 +32,7 @@ arguments
 
   kwargs.approx (1,1) ApproximationType = ApproximationType.Exact;
   kwargs.epsilon (1,1) double = 1E-2;
-  kwargs.maxIter (1,1) double = 1E2;
+  kwargs.maxIter (1,1) double {mustBeGreaterThanOrEqual(kwargs.maxIter, 2)} = 1E2;
   
   kwargs.dataPath (1,1) string = "../Data"
   kwargs.showTariffs (1,1) logical = false % will plots of tariffs be shown?
@@ -42,39 +43,63 @@ end
 showTariffs = kwargs.showTariffs;
 showDemands = kwargs.showDemands;
 transitionPenalty = kwargs.transitionPenalty;
-dt = kwargs.timeStepSize; 
+epsilon = kwargs.epsilon;
 
 %% Constants:
-Joule_TO_kWh = 1 / 3.6e6; % 1kWh = 3.6e6J
 FUEL_INDEX = repelem(1:3, 1, 12).';
 [PRICE_kg_f, HEAT_TARIFF] = NATURAL_GAS_PARAMS();
 SECONDS_PER_MINUTE = 60;
 MINUTES_PER_HOUR = 60;
 SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
+NO_ENVELOPE_ALPHA = 0;
+NODES_CONNECTED_TO_ARTIFICIAL_START = 1;
+NO_STATE_TRANSITION_PENALTY = 0;
+NO_DEMAND = 0;
 % Buildings
 BUILDINGS = BuildingType(1:4);
+NUM_BUILDINGS = numel(BUILDINGS);
 
 %% Initialization
-stepsPerHour = SECONDS_PER_HOUR / dt; % number of time steps in 1h
-% Loading
-g =        struct2array(load(fullfile(kwargs.dataPath, 'graph_24h.mat'), 'g'));
-SV2State = struct2array(load(fullfile(kwargs.dataPath, 'graph_24h.mat'), 'svToStateNumber'));
-[tariffs, demands] = getTariffsAndDemands(BUILDINGS, dt, kwargs);
+stepsPerHour = SECONDS_PER_HOUR / timeStepSize; % number of time steps in 1h
+%% Loading
+tmp = load(fullfile(kwargs.dataPath, 'graph_24h.mat'));
+g = tmp.g; SV2State = tmp.svToStateNumber; clear tmp;
+[elecTariffs, demands, NUM_WINDOWS] = getTariffsAndDemands(BUILDINGS);
+nTotalNodes = size(SV2State, 1); %(smax-smin)*(vmax-vmin+1)+1
+% Engine maps:
+[POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU] = loadEngineMaps(nTotalNodes, kwargs.dataPath);
 % Visualizations?
 if showTariffs || showDemands
-  [dailyTariffs,tariffQueryTimes] = getDailyTariffs(tariffs, dt); %[nTimestepsPerDay, Elec (1), nDays, nBuildings]
-end
-if showTariffs
-  visualizeTariffs(dailyTariffs, stepsPerHour);  
-end
-if showDemands
-  upsampledDemands = upsampleDemands(demands, tariffQueryTimes, smoothPeriod); %[nTimestepsPerDay, Elec+Heat (2), nDays, nBuildings, Mean+Std (2)]
-  visualizeDemands(upsampledDemands, stepsPerHour);
+  [dailyTariffs,tariffQueryTimes] = getDailyTariffs(elecTariffs, timeStepSize); %[nTimestepsPerDay, Elec (1), nDays, nBuildings]
+  if showTariffs
+    visualizeTariffs(dailyTariffs, stepsPerHour);  
+  end
+  if showDemands
+    upsampledDemands = upsampleDemands(demands, tariffQueryTimes, smoothPeriod); %[nTimestepsPerDay, Elec+Heat (2), nDays, nBuildings, Mean+Std (2)]
+    visualizeDemands(upsampledDemands, stepsPerHour);
+  end
 end
 
-% Preliminary computations
-T = getNumTimesteps(dt, endTime);
+%% Preliminary computations
+T = getNumTimesteps(timeStepSize, endTime);
 nF = numel(FUEL_INDEX);
+
+[SV_states, timeFrom, nTimesteps, stateFromMap, stateToMap] = ...
+  transformAdjacencyMatrix(g.Edges.EndNodes(:,1), g.Edges.EndNodes(:,2), SV2State);
+
+% Select the correct column with the final price
+sol_select = [~SV_states(stateFromMap, 1) & ~SV_states(stateToMap, 1), ... % Off-off
+  ~SV_states(stateFromMap, 1) & SV_states(stateToMap, 1), ... % Start up
+  ~SV_states(stateToMap, 1), ... % Shut down
+  true(numel(nTimesteps), 1)]; % Remaining transitions
+[~, sol_select] = max(sol_select, [], 2);
+
+% Assign a small penalty to every input (s,v) change
+transitionPenaltyFlag = [zeros(nTotalNodes, 1); ...
+  ~(SV_states(stateFromMap(nTotalNodes+1:end-nTotalNodes), 1) == SV_states(stateToMap(nTotalNodes+1:end-nTotalNodes), 1) & ... %checks equality of S values
+    SV_states(stateFromMap(nTotalNodes+1:end-nTotalNodes), 2) == SV_states(stateToMap(nTotalNodes+1:end-nTotalNodes), 2));
+   zeros(nTotalNodes,1)]; % checks equality of V values
+
 % Preallocation
 power_nom_MGT = zeros(T, nF);
 heat_nom_MGT = zeros(T, nF);
@@ -103,80 +128,183 @@ robust_Linfty_cost = zeros(1,nF);
 robust_mixed_cost = zeros(1,nF);
 
 %% Compute decided_costs for all algorithms
-# Prepare all inputs for "assignCostsInternal()" based on "assignAllCostsMoving.m"
 nPrices = numel(PRICE_kg_f);
 progressbar('Gas prices', 'Building types', 'Days');
 for iP = 1:nPrices
+  fuelPrice = PRICE_kg_f(iP);
+  heatTariff = HEAT_TARIFF(iP);
   for iB = 1:NUM_BUILDINGS
     for iW = 1:NUM_WINDOWS      
-      %Demand profile for comparing the different solutiosn.
-      %%TODO - connect to CHP2004Provider or a similar class.
-      power_demand_for_comparison = zeros(T,nF);
-      heat_demand_for_comparison = zeros(T,nF);
+      d = demands(iW, iB);
+      mElec = d.valMean(:,1);
+      mHeat = d.valMean(:,2);
+      sElec = d.valStd(:,1);
+      sHeat = d.valStd(:,2);
+            
+      decided_costs_nominal = assignCostsInternal(...
+        sol_select, stateFromMap, stateToMap, nTotalNodes, ...
+        mElec, sElec, mHeat, sHeat, NO_ENVELOPE_ALPHA, ...
+        elecTariffs(iW, iB), heatTariff, fuelPrice,...
+        POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
+        transitionPenaltyFlag, transitionPenalty, ...
+        timeFrom, nTimesteps, stepsPerHour, timeStepSize);
 
-      decided_costs_nominal = assignCostsInternal('demandStandardEnvelope', 0); %alpha = 0
-      decided_costs_robust_Linfty = assignCostsInternal('demandStandardEnvelope', alpha_Linfty);
-      decided_costs_robust_mixed_nospike = assignCostsInternal('demandStandardEnvelope', alpha_Mixed);
-      decided_costs_robust_mixed_withspike = assignCostsInternal('demandStandardEnvelope', alpha_Mixed+alpha_Spikes);
-
-      %Retrieve the index list of the edges - saves time later when changing weights.
-      EdgePermutationMap = g.Edges.Weight;
+      decided_costs_robust_Linfty = assignCostsInternal(...
+        sol_select, stateFromMap, stateToMap, nTotalNodes, ...
+        mElec, sElec, mHeat, sHeat, kwargs.alphaLin, ...
+        elecTariffs(iW, iB), heatTariff, fuelPrice,...
+        POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
+        transitionPenaltyFlag, transitionPenalty, ...
+        timeFrom, nTimesteps, stepsPerHour, timeStepSize);
       
-      %% TODO: <add the rest of the computation>
+      decided_costs_robust_mixed_nospike = assignCostsInternal(...
+        sol_select, stateFromMap, stateToMap, nTotalNodes, ...
+        mElec, sElec, mHeat, sHeat, kwargs.alphaMixed, ...
+        elecTariffs(iW, iB), heatTariff, fuelPrice,...
+        POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
+        transitionPenaltyFlag, transitionPenalty, ...
+        timeFrom, nTimesteps, stepsPerHour, timeStepSize);
+      
+      decided_costs_robust_mixed_withspike = assignCostsInternal(...
+        sol_select, stateFromMap, stateToMap, nTotalNodes, ...
+        mElec, sElec, mHeat, sHeat, kwargs.alphaMixed + kwargs.alphaSpikes, ...
+        elecTariffs(iW, iB), heatTariff, fuelPrice,...
+        POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
+        transitionPenaltyFlag, transitionPenalty, ...
+        timeFrom, nTimesteps, stepsPerHour, timeStepSize);
+      
+      %% Find the shortest paths:
+      % Run the nominal algorithm
+      g_nominal = digraph(stateFromMap, stateToMap, decided_costs_nominal(:, iP));
+      [path_nom_MGT{iP}, path_cost_nom(iP), path_edge_nom{iP}] = shortestpath(g_nominal, 1, max(stateToMap), 'Method', 'acyclic');
+      [power_nom_MGT(:, iP), heat_nom_MGT(:, iP), mdot_nom_MGT(:, iP)] = extractPath(path_nom_MGT{iP}, power_map, heat_map, fuel_map, SV_states);
+      % Run the robust algorithm with Linfty uncertainty set
+      g_robust_Linfty = digraph(stateFromMap, stateToMap, decided_costs_robust_Linfty(:, iP));
+      [path_robust_Linfty{iP}, path_cost_robust_Linfty(iP), path_edge_robust_Linfty{iP}] = shortestpath(g_robust_Linfty, 1, max(stateToMap), 'Method', 'acyclic');
+      [power_robust_Linfty_MGT(:, iP), heat_robust_Linfty_MGT(:, iP), mdot_robust_Linfty_MGT(:, iP)] = extractPath(path_robust_Linfty{iP}, power_map, heat_map, fuel_map, SV_states);
+      % Run the robust algorithm with mixed uncertainty set
+      W_spike = decided_costs_robust_mixed_withspike(:,iP) - decided_costs_robust_mixed_nospike(:,iP);
+      max_W_spike = max(W_spike);
+      min_W_spike = min(W_spike);
+      unique_W_spike = unique(W_spike);
+
+      if (kwargs.approx == ApproximationType.MaxIter)
+          epsilon = (max_W_spike - min_W_spike) / (kwargs.maxIter - 1);
+      end
+
+      switch Mixed_approximation_type
+          case 0
+              Thresholds = unique_W_spike;
+          case {1,3}
+              Thresholds = [min_W_spike:epsilon:max_W_spike,max_W_spike]'; %Add max(W_spike) at the end to assure that the maximum is also taken into account
+          case 2
+              Thresholds = exp([log(min_W_spike):log(1+epsilon):log(max_W_spike),log(max_W_spike)])'; %Add max(W_spike) as before. This is a geometric series.
+          otherwise
+              error('Unsupported Approximation Type');
+      end
+      if length(Thresholds) > length(unique_W_spike)
+          Thresholds = unique_W_spike;
+      end 
+      V_costs = zeros(length(Thresholds),1);
+      V_paths = cell(length(Thresholds),1);
+      V_edge_paths = cell(length(Thresholds),1);
+      g_Mixed = digraph(stateFromMap, stateToMap, decided_costs_robust_mixed_nospike(:, iP));
+      % Retrieve the index list of the edges - saves time later when changing weights.
+      edgePermutationMap = g.Edges.Weight;
+      for j = 1:length(Thresholds)
+          Weights = (W_spike <= Thresholds(j)).*decided_costs_robust_mixed_nospike(:, iP) + (W_spike > Thresholds(j)).*inf;
+          g_Mixed.Edges.Weight = Weights(edgePermutationMap);
+          [V_paths{j}, path_cost, edge_path] = shortestpath(g_Mixed, 1, max(stateToMap), 'Method', 'acyclic');
+          V_costs(j) = path_cost + max(W_spike(edge_path));
+          V_edge_paths{j} = edge_path;
+      end
+
+      [path_cost_robust_Mixed(:), index_path_Mixed] = min(V_costs);
+      path_robust_Mixed{iP} = V_paths(index_path_Mixed);
+      path_edge_robust_Mixed{iP} = V_edge_paths(index_path_Mixed);
+      [power_robust_Mixed_MGT(:, iP), heat_robust_Mixed_MGT(:, iP), mdot_robust_Mixed_MGT(:, iP)] = extractPath(path_robust_Mixed{iP}, power_map, heat_map, fuel_map, SV_states);
+      
+      %% Compare schedules for a single scenario
+      % Replace old cost calculation method, which uses a ZOH for the demands
+      % and generations, with a new edge-based method that linearly
+      % interpolates the demand and generation.
+
+      %%%TODO: If needed (ask Beni) - separate costs to bought electricity,
+      %%% sold electricity, bought fuel, and bought heat. Do this by looking at
+      %%% the individual components which generate the edge cost in
+      %%% assignCosts.m
+      warning('power_demand_for_comparison and heat_demand_for_comparison unmodified since initialization!');
+      
+      pen = path_edge_nom{iP};
+      nom_cost(iP) = sum(assignCostsInternal(...
+        sol_select(pen), stateFromMap(pen), stateToMap(pen), NODES_CONNECTED_TO_ARTIFICIAL_START, ...
+        NO_DEMAND, NO_DEMAND, NO_DEMAND, NO_DEMAND, NO_ENVELOPE_ALPHA, ...
+        elecTariffs(iW, iB), heatTariff, fuelPrice,...
+        POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
+        transitionPenaltyFlag(pen), NO_STATE_TRANSITION_PENALTY, ...
+        timeFrom(pen), nTimesteps(pen), stepsPerHour, timeStepSize));
+      
+      pel = path_edge_robust_Linfty{iP};
+      robust_Linfty_cost(iP) = sum(assignCostsInternal(...
+        sol_select(pel), stateFromMap(pel), stateToMap(pel), NODES_CONNECTED_TO_ARTIFICIAL_START, ...
+        NO_DEMAND, NO_DEMAND, NO_DEMAND, NO_DEMAND, kwargs.alphaLin, ...
+        elecTariffs(iW, iB), heatTariff, fuelPrice,...
+        POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
+        transitionPenaltyFlag(pel), NO_STATE_TRANSITION_PENALTY, ...
+        timeFrom(pel), nTimesteps(pel), stepsPerHour, timeStepSize));      
+      
+      pem = path_edge_robust_Mixed{iP};
+      robust_mixed_cost(iP) = sum(assignCostsInternal(...
+        sol_select(pem), stateFromMap(pem), stateToMap(pem), NODES_CONNECTED_TO_ARTIFICIAL_START, ...
+        NO_DEMAND, NO_DEMAND, NO_DEMAND, NO_DEMAND, kwargs.alphaMixed, ...
+        elecTariffs(iW, iB), heatTariff, fuelPrice,...
+        POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
+        transitionPenaltyFlag(pem), NO_STATE_TRANSITION_PENALTY, ...
+        timeFrom(pem), nTimesteps(pem), stepsPerHour, timeStepSize));
+      
+      % TODO: Make sure the above are equivalent to:      
+      %{
+      nom_cost(iP) = sum(assignCosts(double(dt), power_map, heat_map, fuel_map, mdot_fuel_SU, 1,... %1 - only one node in this path is connected to the artificial start/end node.
+                        sol_select(path_edge_nom), time_from(path_edge_nom), n_tsteps(path_edge_nom),...
+                        from_state_map(path_edge_nom), to_state_map(path_edge_nom),power_demand_for_comparison(:, d_index), heat_demand_for_comparison(:, d_index),...
+                        elec_tariff(:, d_index), heat_tariff(fuel_index(iP)), price_kg_f(fuel_index(iP)), transition_penalty(path_edge_nom),0));  
+
+      robust_Linfty_cost(iP) = sum(assignCosts(double(dt), power_map, heat_map, fuel_map, mdot_fuel_SU, 1,... %1 - only one node in this path is connected to the artificial start/end node.
+                        sol_select(path_edge_robust_Linfty), time_from(path_edge_robust_Linfty), n_tsteps(path_edge_robust_Linfty),...
+                        from_state_map(path_edge_robust_Linfty), to_state_map(path_edge_robust_Linfty),power_demand_for_comparison(:, d_index), heat_demand_for_comparison(:, d_index),...
+                        elec_tariff(:, d_index), heat_tariff(fuel_index(iP)), price_kg_f(fuel_index(iP)), transition_penalty(path_edge_robust_Linfty),0));  
+
+      robust_mixed_cost(iP) = sum(assignCosts(double(dt), power_map, heat_map, fuel_map, mdot_fuel_SU, 1,... %1 - only one node in this path is connected to the artificial start/end node.
+                        sol_select(path_edge_robust_Mixed), time_from(path_edge_robust_Mixed), n_tsteps(path_edge_robust_Mixed),...
+                        from_state_map(path_edge_robust_Mixed), to_state_map(path_edge_robust_Mixed),power_demand_for_comparison(:, d_index), heat_demand_for_comparison(:, d_index),...
+                        elec_tariff(:, d_index), heat_tariff(fuel_index(iP)), price_kg_f(fuel_index(iP)), transition_penalty(path_edge_robust_Mixed),0));
+      %}              
+      keyboard; % TODO: make sure some aggregation (iteration results are saved somewhere) is taking place!
     end
   end
 end
 
 end
 
-function [decided_costs] = assignCostsInternal(sol_select, time_from, n_tsteps, ...
-  from_state_map, to_state_map, demands, tariffs, fuelPrices, heatTariff,...
-  powerMap, heatMap, fuelMap, ...
-  mdot_fuel_SU, transition_penalty_indicator, stepsPerHour, ...
-  fuelPriceId, buildingId, windowId, kwargs)
-%% Handle inputs
-arguments
-  sol_select
-  time_from
-  n_tsteps
-  from_state_map
-  to_state_map
-  demands
-  tariffs
-  fuelPrices % PRICE_kg_f
-  heatTariff % HEAT_TARIFF
-  powerMap
-  heatMap
-  fuelMap
-  mdot_fuel_SU
-  transition_penalty_indicator
-  stepsPerHour
-  fuelPriceId % TODO: remove
-  buildingId  % TODO: remove
-  windowId    % TODO: remove
-  kwargs.transitionPenalty (1,1) double = 0.01;
-  kwargs.demandStandardEnvelope (1,1) double {mustBeNonnegative} = 0; % α in: expectedDemand = μ ± α·σ
-  kwargs.timeStepSize (1,1) double = 15; % duration of time step in [s]
-end
-% Unpack kwargs:
-transitionPenalty = kwargs.transitionPenalty;
-alpha = kwargs.demandStandardEnvelope;
-dt = kwargs.timeStepSize; 
+function [decided_costs] = assignCostsInternal(...
+  sol_select, stateFromMap, stateToMap, nTotalNodes, ...
+  elecDemandMean, elecDemandStd, heatDemandMean, heatDemandStd, demandStandardEnvelope, ...
+  elecTariff, heatTariff, fuelPrice,...
+  powerMap, heatMap, fuelMap, mdot_fuel_SU, ...
+  transitionPenaltyFlag, transitionPenalty, ...
+  time_from, nTimesteps, stepsPerHour, timeStepSize)
 
-%% Assign edge costs
-fuel_price = PRICE_kg_f(fuelPriceId);
-d = demands(windowId, buildingId);
-mPower = d.valMean(:,1);
-mHeat = d.valMean(:,2);
-sPower = d.valStd(:,1);
-sHeat = d.valStd(:,2);
+% Apply alpha:
+elecDemand = elecDemandMean + demandStandardEnvelope * elecDemandStd;
+heatDemand = heatDemandMean + demandStandardEnvelope * heatDemandStd;
+
+% Assign edge costs
 decided_costs = assignCosts(...
-  double(dt), powerMap, heatMap, fuel_map, ...
-  mdot_fuel_SU, total_nodes, sol_select, time_from, n_tsteps,...
-  from_state_map, to_state_map,...
-  mPower + alpha * sPower, mHeat + alpha * sHeat, ...
-  elecTariffs(windowId, buildingId), heatTariff(fuelPriceId), fuel_price, ...
-  transition_penalty_indicator, transitionPenalty, N_LINES);
+  timeStepSize, powerMap, heatMap, fuelMap, ...
+  mdot_fuel_SU, nTotalNodes, sol_select, time_from, nTimesteps,...
+  stateFromMap, stateToMap,...
+  elecDemand, heatDemand, elecTariff, heatTariff, fuelPrice, ...
+  transitionPenaltyFlag, transitionPenalty, stepsPerHour);
 end
 
 function T = getNumTimesteps(dt, endTime)
@@ -186,9 +314,8 @@ function T = getNumTimesteps(dt, endTime)
   T = endTime * SECONDS_PER_HOUR / dt;    
 end
 
-function [elecTariffs, demands] = getTariffsAndDemands(buildings, dt, kwargs)
+function [elecTariffs, demands, NUM_WINDOWS] = getTariffsAndDemands(buildings)
 [CHP, NUM_WINDOWS] = LOAD_DEMAND_DATASETS();
-smoothPeriod = kwargs.smoothDemandTimesteps;
 
 %% Get all tariff & demand combinations
 nBuildings = numel(buildings);
@@ -255,6 +382,34 @@ chp = struct2array(load('../Data/CHP2004.mat', 'chp'));
 nWindows = struct2array(load('../Data/CHP2004.mat', 'nextCnt'));
 end
 
+function [powerMap, heatMap, fuelMap, mdotFuelSU] = loadEngineMaps(expectedTotalNodes, dataPath)
+arguments 
+  expectedTotalNodes (1,1) double {mustBeInteger, mustBePositive} = NaN
+  dataPath (1,1) string = "../Data"
+end
+%% Load (and optionally rename) mappings
+if isfile(fullfile(dataPath, 'CHP.mat')) % Engine similar to Capstone C65 (incl. extrapolation)
+  tmp = load(fullfile(dataPath, 'CHP.mat'));
+  powerMap = tmp.PowerSurf;
+  heatMap = tmp.PheatSurfExt;
+  m_dot_f_map = tmp.FFSurfExt;
+else
+  tmp = load(fullfile(dataPath, 'sv_mappings.mat')); % "Virtual" engine
+  powerMap = tmp.power_map;
+  heatMap = tmp.heat_map;
+  m_dot_f_map = tmp.m_dot_f_map;
+end
+% Verify that we have the right mappings:
+assert( isequal( numel(powerMap), numel(heatMap), numel(m_dot_f_map), expectedTotalNodes-1 ), ...
+  'Mismatch between matrix sizes! Try using a different ''sv_mappings'' file.');
+
+% Reshape the power maps
+powerMap = [reshape(powerMap.', [], 1); 0];
+heatMap = [reshape(heatMap.', [], 1); 0];
+fuelMap = [reshape(m_dot_f_map.', [], 1); 0];
+mdotFuelSU = sum(m_dot_f_map(:, 1:end-1)+m_dot_f_map(:, 2:end), 2); % Computes mdot of fuel consumed in startup for all the different max states
+end
+
 function [dailyTariffs,tariffQueryTimes] = getDailyTariffs(hourlyElecTariffs, dt)
 SECONDS_PER_MINUTE = 60;
 MINUTES_PER_HOUR = 60;
@@ -311,7 +466,7 @@ end
 end
 
 function [] = visualizeTariffs(t, stepsPerHour)
-  [nTimestepsPerDay, ~, nDays, nBuildings] = size(t);
+  [nTimestepsPerDay, ~, nDays, nBuildings] = size(t); %#ok<ASGLU>
   assert(nBuildings == 4, 'The function is configured to visualize exactly 4 buildings.');
   %% Preparations    
   BLDG_DESCR = {'Large Hotel', 'Full Service Restaraunt', 'Small Hotel', 'Residential'};
