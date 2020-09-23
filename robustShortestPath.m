@@ -187,42 +187,44 @@ for iP = 1:nPrices
       max_W_spike = max(W_spike);
       min_W_spike = min(W_spike);
       unique_W_spike = unique(W_spike);
+      nUWS = numel(unique_W_spike);
 
       if (kwargs.approx == ApproximationType.MaxIter)
           epsilon = (max_W_spike - min_W_spike) / (kwargs.maxIter - 1);
       end
 
-      switch Mixed_approximation_type
-          case 0
-              Thresholds = unique_W_spike;
-          case {1,3}
-              Thresholds = [min_W_spike:epsilon:max_W_spike,max_W_spike]'; %Add max(W_spike) at the end to assure that the maximum is also taken into account
-          case 2
-              Thresholds = exp([log(min_W_spike):log(1+epsilon):log(max_W_spike),log(max_W_spike)])'; %Add max(W_spike) as before. This is a geometric series.
-          otherwise
-              error('Unsupported Approximation Type');
+      switch kwargs.approx
+        case ApproximationType.Exact
+          Thresholds = unique_W_spike;
+        case {ApproximationType.Additive, ApproximationType.MaxIter}
+          Thresholds = [min_W_spike:epsilon:max_W_spike,max_W_spike].'; %Add max(W_spike) at the end to assure that the maximum is also taken into account
+        case ApproximationType.Multiplicative
+          Thresholds = exp([log(min_W_spike):log(1+epsilon):log(max_W_spike),log(max_W_spike)]).'; %Add max(W_spike) as before. This is a geometric series.
+        otherwise
+          error('Unsupported Approximation Type');
       end
-      if length(Thresholds) > length(unique_W_spike)
+      nTrs = numel(Thresholds);
+      if nTrs > nUWS
           Thresholds = unique_W_spike;
       end 
-      V_costs = zeros(length(Thresholds),1);
-      V_paths = cell(length(Thresholds),1);
-      V_edge_paths = cell(length(Thresholds),1);
+      V_costs = zeros(nTrs,1);
+      V_paths = cell(nTrs,1);
+      V_edge_paths = cell(nTrs,1);
       g_Mixed = digraph(stateFromMap, stateToMap, decided_costs_robust_mixed_nospike(:, iP));
       % Retrieve the index list of the edges - saves time later when changing weights.
       edgePermutationMap = g.Edges.Weight;
-      for j = 1:length(Thresholds)
-          Weights = (W_spike <= Thresholds(j)).*decided_costs_robust_mixed_nospike(:, iP) + (W_spike > Thresholds(j)).*inf;
+      for iT = 1:nTrs
+          Weights = (W_spike <= Thresholds(iT)).*decided_costs_robust_mixed_nospike(:, iP) + (W_spike > Thresholds(iT)).*inf;
           g_Mixed.Edges.Weight = Weights(edgePermutationMap);
-          [V_paths{j}, path_cost, edge_path] = shortestpath(g_Mixed, 1, max(stateToMap), 'Method', 'acyclic');
-          V_costs(j) = path_cost + max(W_spike(edge_path));
-          V_edge_paths{j} = edge_path;
+          [V_paths{iT}, path_cost, edge_path] = shortestpath(g_Mixed, 1, max(stateToMap), 'Method', 'acyclic');
+          V_costs(iT) = path_cost + max(W_spike(edge_path));
+          V_edge_paths{iT} = edge_path;
       end
 
       [path_cost_robust_Mixed(:), index_path_Mixed] = min(V_costs);
-      path_robust_Mixed{iP} = V_paths(index_path_Mixed);
+      path_robust_Mixed(iP) = V_paths(index_path_Mixed);
       path_edge_robust_Mixed{iP} = V_edge_paths(index_path_Mixed);
-      [power_robust_Mixed_MGT(:, iP), heat_robust_Mixed_MGT(:, iP), mdot_robust_Mixed_MGT(:, iP)] = extractPath(path_robust_Mixed{iP}, power_map, heat_map, fuel_map, SV_states);
+      [power_robust_Mixed_MGT(:, iP), heat_robust_Mixed_MGT(:, iP), mdot_robust_Mixed_MGT(:, iP)] = extractPath(path_robust_Mixed{iP}, POWER_MAP, HEAT_MAP, FUEL_MAP, SV_states);
       
       %% Compare schedules for a single scenario
       % Replace old cost calculation method, which uses a ZOH for the demands
@@ -233,7 +235,6 @@ for iP = 1:nPrices
       %%% sold electricity, bought fuel, and bought heat. Do this by looking at
       %%% the individual components which generate the edge cost in
       %%% assignCosts.m
-      warning('power_demand_for_comparison and heat_demand_for_comparison unmodified since initialization!');
       
       pen = path_edge_nom{iP};
       nom_cost(iP) = sum(assignCostsInternal(...
