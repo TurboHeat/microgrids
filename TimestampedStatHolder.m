@@ -96,27 +96,29 @@ classdef TimestampedStatHolder < handle
   end % public methods
   
   methods (Access = protected, Static = true)
+    function [g, uh] = findSameHourGroups(timestamps)
+      h = timestamps.Hour;
+      [g,uh] = findgroups(h);
+    end
+    
     function [meanValsVec, stdValsVec, uh] = hourlyWeightedMeanStd(timestamps, values, weights)
       % This function produces hourly weighted averages of the provided values
       % It is assumed that weekends have been included/excluded in advance     
-      h = timestamps.Hour;
-      [g,uh] = findgroups(h);
+      [g,uh] = TimestampedStatHolder.findSameHourGroups(timestamps);
       [meanValsVec,stdValsVec] = splitapply(@TimestampedStatHolder.wMeanAndStd, values, weights, g);      
     end    
     
     function [meanValsVec, h] = hourlyWeightedMean(timestamps, values, weights)
       % This function produces hourly weighted averages of the provided values
       % It is assumed that weekends have been included/excluded in advance    
-      h = timestamps.Hour;
-      g = findgroups(h);
+      g = TimestampedStatHolder.findSameHourGroups(timestamps);
       meanValsVec = splitapply(@TimestampedStatHolder.weightedMean, values, weights, g);      
     end
     
     function [stdValsVec, h] = hourlyWeightedStd(timestamps, values, weights)
       % This function produces hourly weighted standard deviations of the provided values
       % It is assumed that weekends have been included/excluded in advance   
-      h = timestamps.Hour;
-      g = findgroups(h);
+      g = TimestampedStatHolder.findSameHourGroups(timestamps);
       stdValsVec = splitapply(@TimestampedStatHolder.weightedStdev, values, weights, g);      
     end
     
