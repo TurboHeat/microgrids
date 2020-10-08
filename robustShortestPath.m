@@ -15,35 +15,37 @@ function [] = robustShortestPath(timeStepSize, endTime, kwargs)
 arguments
   timeStepSize (1,1) double {mustBePositive} = 15 % length of a timestep in [s]
   endTime (1,1) double {mustBePositive} = 24; % final time in [h]
-  kwargs.alphaLin (1,1) double = 1; 
+  kwargs.alphaLin (1,1) double = 0.6; 
   % Parameter for first uncertainty set. 
   % In equation (6) in the paper, we take:
   %   Delta_P(t) = alpha_Linfty*std_P(t) 
   %   Delta_H(t) = alpha_Linfty*std_H(t).
   
-  kwargs.alphaMixed (1,1) double = 0.1; 
+  kwargs.alphaMixed (1,1) double = 0.2; 
   % Parameter for second uncertainty set (Algorithm 1 in the paper).
   
-  kwargs.alphaSpikes (1,1) double = 1*sqrt( getNumTimesteps(timeStepSize, endTime) ); 
+  kwargs.alphaSpikes (1,1) double = 2*sqrt( getNumTimesteps(timeStepSize, endTime) ); 
   % Parameter for second uncertainty set (Algorithm 1 in paper).
   % In equation (7) in the paper, we take Delta_P(t) = alpha_Mixed*std_P(t) and
   % Delta_H(t) = alpha_Mixed*std_H(t). Moreover, we take delta_{P,t} = std_P(t),
   % delta_{H,t} = std_H(t) and mu_1 = alpha_spikes.
 
-  kwargs.approx (1,1) ApproximationType = ApproximationType.Exact;
-  kwargs.epsilon (1,1) double = 1E-2;
-  kwargs.maxIter (1,1) double {mustBeGreaterThanOrEqual(kwargs.maxIter, 2)} = 1E2;
+  kwargs.approx (1,1) ApproximationType = ApproximationType.MaxIter;
+  kwargs.epsilon (1,1) double = 1E-1;
+  kwargs.maxIter (1,1) double {mustBeGreaterThanOrEqual(kwargs.maxIter, 2)} = 2;
   
   kwargs.dataPath (1,1) string = "../Data"
   kwargs.showTariffs (1,1) logical = false % will plots of tariffs be shown?
   kwargs.showDemands (1,1) logical = false % will plots of demands be shown?
   kwargs.transitionPenalty (1,1) double = 0.01;
+  kwargs.smoothDemandTimesteps (1,1) double {mustBeInteger, mustBePositive} = 21; % number of timesteps for smoothing. 1=off
 end
 % Unpack kwargs:
 showTariffs = kwargs.showTariffs;
 showDemands = kwargs.showDemands;
 transitionPenalty = kwargs.transitionPenalty;
 epsilon = kwargs.epsilon;
+smoothPeriod = kwargs.smoothDemandTimesteps;
 
 %% Constants:
 FUEL_INDEX = repelem(1:3, 1, 12).';
@@ -54,7 +56,6 @@ SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
 NO_ENVELOPE_ALPHA = 0;
 NODES_CONNECTED_TO_ARTIFICIAL_START = 1;
 NO_STATE_TRANSITION_PENALTY = 0;
-NO_DEMAND = 0;
 % Buildings
 BUILDINGS = BuildingType(1:4);
 NUM_BUILDINGS = numel(BUILDINGS);
@@ -64,7 +65,7 @@ stepsPerHour = SECONDS_PER_HOUR / timeStepSize; % number of time steps in 1h
 %% Loading
 tmp = load(fullfile(kwargs.dataPath, 'graph_24h.mat'));
 g = tmp.g; SV2State = tmp.svToStateNumber; clear tmp;
-[elecTariffs, demands, NUM_WINDOWS] = getTariffsAndDemands(BUILDINGS);
+[elecTariffs, demands_estimate, demands_true, NUM_WINDOWS] = getTariffsAndDemands(BUILDINGS);
 nTotalNodes = size(SV2State, 1); %(smax-smin)*(vmax-vmin+1)+1
 % Engine maps:
 [POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU] = loadEngineMaps(nTotalNodes, kwargs.dataPath);
@@ -75,7 +76,7 @@ if showTariffs || showDemands
     visualizeTariffs(dailyTariffs, stepsPerHour);  
   end
   if showDemands
-    upsampledDemands = upsampleDemands(demands, tariffQueryTimes, smoothPeriod); %[nTimestepsPerDay, Elec+Heat (2), nDays, nBuildings, Mean+Std (2)]
+    upsampledDemands = upsampleDemands(demands_estimate, tariffQueryTimes, smoothPeriod); %[nTimestepsPerDay, Elec+Heat (2), nDays, nBuildings, Mean+Std (2)]
     visualizeDemands(upsampledDemands, stepsPerHour);
   end
 end
@@ -83,6 +84,7 @@ end
 %% Preliminary computations
 T = getNumTimesteps(timeStepSize, endTime);
 nF = numel(FUEL_INDEX);
+NO_DEMAND = zeros(T,1);
 
 [SV_states, timeFrom, nTimesteps, stateFromMap, stateToMap] = ...
   transformAdjacencyMatrix(g.Edges.EndNodes(:,1), g.Edges.EndNodes(:,2), SV2State);
@@ -129,17 +131,46 @@ robust_mixed_cost = zeros(1,nF);
 
 %% Compute decided_costs for all algorithms
 nPrices = numel(PRICE_kg_f);
+
+% Performance Statistics
+LinftyRobustBetterThanNominal = zeros(nPrices,NUM_BUILDINGS);
+MixedRobustBetterThanNominal = zeros(nPrices,NUM_BUILDINGS);
+
+% Consistency
+NominalCostsMoreThanExpected = zeros(nPrices,NUM_BUILDINGS);
+LinftyRobustCostsMoreThanExpected = zeros(nPrices,NUM_BUILDINGS);
+MixedRobustCostsMoreThanExpected = zeros(nPrices,NUM_BUILDINGS);
+
+% Worst and Best Day Performance
+BestDayLinftyRobustVsNominal = zeros(nPrices,NUM_BUILDINGS);
+BestDayMixedRobustVsNominal = zeros(nPrices,NUM_BUILDINGS);
+WorstDayLinftyRobustVsNominal = zeros(nPrices,NUM_BUILDINGS);
+WorstDayMixedRobustVsNominal = zeros(nPrices,NUM_BUILDINGS);
+
+
+BestRatioLinftyRobustVsNominal = zeros(nPrices,NUM_BUILDINGS);
+BestRatioMixedRobustVsNominal = zeros(nPrices,NUM_BUILDINGS);
+WorstRatioLinftyRobustVsNominal = zeros(nPrices,NUM_BUILDINGS);
+WorstRatioMixedRobustVsNominal = zeros(nPrices,NUM_BUILDINGS);
+
+WorstRatioNominalTrueCostOverExpectedCost = zeros(nPrices,NUM_BUILDINGS);
+WorstDayNominalTrueCostOverExpectedCost = zeros(nPrices,NUM_BUILDINGS);
+WorstRatioRobustLinftyTrueCostOverExpectedCost = zeros(nPrices,NUM_BUILDINGS);
+WorstDayRobustLinftyTrueCostOverExpectedCost = zeros(nPrices,NUM_BUILDINGS);
+WorstRatioRobustMixedTrueCostOverExpectedCost = zeros(nPrices,NUM_BUILDINGS);
+WorstDayRobustMixedTrueCostOverExpectedCost = zeros(nPrices,NUM_BUILDINGS);
+
 progressbar('Gas prices', 'Building types', 'Days');
 for iP = 1:nPrices
   fuelPrice = PRICE_kg_f(iP);
   heatTariff = HEAT_TARIFF(iP);
   for iB = 1:NUM_BUILDINGS
-    for iW = 1:NUM_WINDOWS      
-      d = demands(iW, iB);
-      mElec = d.valMean(:,1);
-      mHeat = d.valMean(:,2);
-      sElec = d.valStd(:,1);
-      sHeat = d.valStd(:,2);
+    for iW = 1:NUM_WINDOWS     
+      d = demands_estimate(iW, iB);
+      mElec = 1e3*d.valMean(:,1); %1e3* - conversion from kWh to W.
+      mHeat = 1e3*d.valMean(:,2);
+      sElec = 1e3*d.valStd(:,1);
+      sHeat = 1e3*d.valStd(:,2);
             
       decided_costs_nominal = assignCostsInternal(...
         sol_select, stateFromMap, stateToMap, nTotalNodes, ...
@@ -175,13 +206,15 @@ for iP = 1:nPrices
       
       %% Find the shortest paths:
       % Run the nominal algorithm
-      g_nominal = digraph(stateFromMap, stateToMap, decided_costs_nominal(:, iP));
-      [path_nom_MGT{iP}, path_cost_nom(iP), path_edge_nom{iP}] = shortestpath(g_nominal, 1, max(stateToMap), 'Method', 'acyclic');
-      [power_nom_MGT(:, iP), heat_nom_MGT(:, iP), mdot_nom_MGT(:, iP)] = extractPath(path_nom_MGT{iP}, power_map, heat_map, fuel_map, SV_states);
+      g_nominal = digraph(g.Edges.EndNodes(:,1), g.Edges.EndNodes(:,2), decided_costs_nominal(:, iP));
+      [path_nom_MGT, path_cost_nom(iW), path_edge_nom] = shortestpath(g_nominal, 1, max(g.Edges.EndNodes(:,2)), 'Method', 'acyclic');
+      [power_nom_MGT, heat_nom_MGT, mdot_nom_MGT] = extractPath(path_nom_MGT, POWER_MAP, HEAT_MAP, FUEL_MAP, SV_states);
+      
       % Run the robust algorithm with Linfty uncertainty set
-      g_robust_Linfty = digraph(stateFromMap, stateToMap, decided_costs_robust_Linfty(:, iP));
-      [path_robust_Linfty{iP}, path_cost_robust_Linfty(iP), path_edge_robust_Linfty{iP}] = shortestpath(g_robust_Linfty, 1, max(stateToMap), 'Method', 'acyclic');
-      [power_robust_Linfty_MGT(:, iP), heat_robust_Linfty_MGT(:, iP), mdot_robust_Linfty_MGT(:, iP)] = extractPath(path_robust_Linfty{iP}, power_map, heat_map, fuel_map, SV_states);
+      g_robust_Linfty = digraph(g.Edges.EndNodes(:,1), g.Edges.EndNodes(:,2), decided_costs_robust_Linfty(:, iP));
+      [path_robust_Linfty, path_cost_robust_Linfty(iW), path_edge_robust_Linfty] = shortestpath(g_robust_Linfty, 1, max(g.Edges.EndNodes(:,2)), 'Method', 'acyclic');
+      [power_robust_Linfty_MGT, heat_robust_Linfty_MGT, mdot_robust_Linfty_MGT] = extractPath(path_robust_Linfty, POWER_MAP, HEAT_MAP, FUEL_MAP, SV_states);
+      
       % Run the robust algorithm with mixed uncertainty set
       W_spike = decided_costs_robust_mixed_withspike(:,iP) - decided_costs_robust_mixed_nospike(:,iP);
       max_W_spike = max(W_spike);
@@ -203,28 +236,31 @@ for iP = 1:nPrices
         otherwise
           error('Unsupported Approximation Type');
       end
+      epsilons(iW) = epsilon;
       nTrs = numel(Thresholds);
       if nTrs > nUWS
           Thresholds = unique_W_spike;
+          nTrs = numel(Thresholds);
       end 
       V_costs = zeros(nTrs,1);
       V_paths = cell(nTrs,1);
       V_edge_paths = cell(nTrs,1);
-      g_Mixed = digraph(stateFromMap, stateToMap, decided_costs_robust_mixed_nospike(:, iP));
+      g_Mixed = digraph(g.Edges.EndNodes(:,1), g.Edges.EndNodes(:,2), 1:length(g.Edges.EndNodes(:,1)));
       % Retrieve the index list of the edges - saves time later when changing weights.
-      edgePermutationMap = g.Edges.Weight;
+      edgePermutationMap = g_Mixed.Edges.Weight;
       for iT = 1:nTrs
-          Weights = (W_spike <= Thresholds(iT)).*decided_costs_robust_mixed_nospike(:, iP) + (W_spike > Thresholds(iT)).*inf;
+          Weights =  decided_costs_robust_mixed_nospike(:, iP);
+          Weights(W_spike > Thresholds(iT)) = inf;
           g_Mixed.Edges.Weight = Weights(edgePermutationMap);
-          [V_paths{iT}, path_cost, edge_path] = shortestpath(g_Mixed, 1, max(stateToMap), 'Method', 'acyclic');
+          [V_paths{iT}, path_cost, edge_path] = shortestpath(g_Mixed, 1,max(g.Edges.EndNodes(:,2)), 'Method', 'acyclic');
           V_costs(iT) = path_cost + max(W_spike(edge_path));
           V_edge_paths{iT} = edge_path;
       end
 
-      [path_cost_robust_Mixed(:), index_path_Mixed] = min(V_costs);
-      path_robust_Mixed(iP) = V_paths(index_path_Mixed);
-      path_edge_robust_Mixed{iP} = V_edge_paths(index_path_Mixed);
-      [power_robust_Mixed_MGT(:, iP), heat_robust_Mixed_MGT(:, iP), mdot_robust_Mixed_MGT(:, iP)] = extractPath(path_robust_Mixed{iP}, POWER_MAP, HEAT_MAP, FUEL_MAP, SV_states);
+      [path_cost_robust_Mixed(iW), index_path_Mixed] = min(V_costs);
+      path_robust_Mixed = V_paths{index_path_Mixed};
+      path_edge_robust_Mixed = V_edge_paths{index_path_Mixed};
+      [power_robust_Mixed_MGT, heat_robust_Mixed_MGT, mdot_robust_Mixed_MGT] = extractPath(path_robust_Mixed, POWER_MAP, HEAT_MAP, FUEL_MAP, SV_states);
       
       %% Compare schedules for a single scenario
       % Replace old cost calculation method, which uses a ZOH for the demands
@@ -234,30 +270,32 @@ for iP = 1:nPrices
       %%%TODO: If needed (ask Beni) - separate costs to bought electricity,
       %%% sold electricity, bought fuel, and bought heat. Do this by looking at
       %%% the individual components which generate the edge cost in
-      %%% assignCosts.m
+      %%% assignCosts.m       
+
+      d = demands_true(iW, iB);
       
-      pen = path_edge_nom{iP};
-      nom_cost(iP) = sum(assignCostsInternal(...
+      pen = path_edge_nom;
+      nom_cost(iW) = sum(assignCostsInternal(...
         sol_select(pen), stateFromMap(pen), stateToMap(pen), NODES_CONNECTED_TO_ARTIFICIAL_START, ...
-        NO_DEMAND, NO_DEMAND, NO_DEMAND, NO_DEMAND, NO_ENVELOPE_ALPHA, ...
+        1e3*d.valMean(:,1), 0*d.valMean(:,1), 1e3*d.valMean(:,2), 0*d.valMean(:,2), 0, ...
         elecTariffs(iW, iB), heatTariff, fuelPrice,...
         POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
         transitionPenaltyFlag(pen), NO_STATE_TRANSITION_PENALTY, ...
         timeFrom(pen), nTimesteps(pen), stepsPerHour, timeStepSize));
       
-      pel = path_edge_robust_Linfty{iP};
-      robust_Linfty_cost(iP) = sum(assignCostsInternal(...
+      pel = path_edge_robust_Linfty;
+      robust_Linfty_cost(iW) = sum(assignCostsInternal(...
         sol_select(pel), stateFromMap(pel), stateToMap(pel), NODES_CONNECTED_TO_ARTIFICIAL_START, ...
-        NO_DEMAND, NO_DEMAND, NO_DEMAND, NO_DEMAND, kwargs.alphaLin, ...
+        1e3*d.valMean(:,1), 0*d.valMean(:,1), 1e3*d.valMean(:,2), 0*d.valMean(:,2), 0, ...
         elecTariffs(iW, iB), heatTariff, fuelPrice,...
         POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
         transitionPenaltyFlag(pel), NO_STATE_TRANSITION_PENALTY, ...
         timeFrom(pel), nTimesteps(pel), stepsPerHour, timeStepSize));      
       
-      pem = path_edge_robust_Mixed{iP};
-      robust_mixed_cost(iP) = sum(assignCostsInternal(...
+      pem = path_edge_robust_Mixed;
+      robust_mixed_cost(iW) = sum(assignCostsInternal(...
         sol_select(pem), stateFromMap(pem), stateToMap(pem), NODES_CONNECTED_TO_ARTIFICIAL_START, ...
-        NO_DEMAND, NO_DEMAND, NO_DEMAND, NO_DEMAND, kwargs.alphaMixed, ...
+        1e3*d.valMean(:,1), 0*d.valMean(:,1), 1e3*d.valMean(:,2), 0*d.valMean(:,2), 0, ...
         elecTariffs(iW, iB), heatTariff, fuelPrice,...
         POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
         transitionPenaltyFlag(pem), NO_STATE_TRANSITION_PENALTY, ...
@@ -270,7 +308,7 @@ for iP = 1:nPrices
                         from_state_map(path_edge_nom), to_state_map(path_edge_nom),power_demand_for_comparison(:, d_index), heat_demand_for_comparison(:, d_index),...
                         elec_tariff(:, d_index), heat_tariff(fuel_index(iP)), price_kg_f(fuel_index(iP)), transition_penalty(path_edge_nom),0));  
 
-      robust_Linfty_cost(iP) = sum(assignCosts(double(dt), power_map, heat_map, fuel_map, mdot_fuel_SU, 1,... %1 - only one node in this path is connected to the artificial start/end node.
+      robust_Linfty_cost(iP) = sum(assignCMosts(double(dt), power_map, heat_map, fuel_map, mdot_fuel_SU, 1,... %1 - only one node in this path is connected to the artificial start/end node.
                         sol_select(path_edge_robust_Linfty), time_from(path_edge_robust_Linfty), n_tsteps(path_edge_robust_Linfty),...
                         from_state_map(path_edge_robust_Linfty), to_state_map(path_edge_robust_Linfty),power_demand_for_comparison(:, d_index), heat_demand_for_comparison(:, d_index),...
                         elec_tariff(:, d_index), heat_tariff(fuel_index(iP)), price_kg_f(fuel_index(iP)), transition_penalty(path_edge_robust_Linfty),0));  
@@ -280,8 +318,53 @@ for iP = 1:nPrices
                         from_state_map(path_edge_robust_Mixed), to_state_map(path_edge_robust_Mixed),power_demand_for_comparison(:, d_index), heat_demand_for_comparison(:, d_index),...
                         elec_tariff(:, d_index), heat_tariff(fuel_index(iP)), price_kg_f(fuel_index(iP)), transition_penalty(path_edge_robust_Mixed),0));
       %}              
-      keyboard; % TODO: make sure some aggregation (iteration results are saved somewhere) is taking place!
     end
+    % keyboard;
+    
+    LinftyRobustOverNominal = robust_Linfty_cost./nom_cost;
+    MixedRobustOverNominal = robust_mixed_cost./nom_cost;
+    NominalTrueCostOverExpectedCost = nom_cost./path_cost_nom;
+    RobustLinftyTrueCostOverExpectedCost = robust_Linfty_cost./path_cost_robust_Linfty;
+    RobustMixedTrueCostOverExpectedCost = robust_mixed_cost./path_cost_robust_Mixed;
+
+    % Performance Statistics
+    LinftyRobustBetterThanNominal(iP,iB) = sum(LinftyRobustOverNominal <= 1)./NUM_WINDOWS;
+    MixedRobustBetterThanNominal(iP,iB) = sum(MixedRobustOverNominal <= 1)./NUM_WINDOWS;
+    
+    % Consistency
+    NominalCostsMoreThanExpected(iP,iB) = sum(NominalTrueCostOverExpectedCost >= 1)./NUM_WINDOWS;
+    LinftyRobustCostsMoreThanExpected(iP,iB) = sum(RobustLinftyTrueCostOverExpectedCost >= 1)./NUM_WINDOWS;
+    MixedRobustCostsMoreThanExpected(iP,iB) = sum(RobustMixedTrueCostOverExpectedCost >= 1)./NUM_WINDOWS;
+    
+    % Worst and Best Day Performance
+    [BestRatioLinftyRobustVsNominal(iP,iB),BestDayLinftyRobustVsNominal(iP,iB)] = min(LinftyRobustOverNominal); 
+    [BestRatioMixedRobustVsNominal(iP,iB),BestDayMixedRobustVsNominal(iP,iB)] = min(MixedRobustOverNominal);
+    [WorstRatioLinftyRobustVsNominal(iP,iB),WorstDayLinftyRobustVsNominal(iP,iB)] = max(LinftyRobustOverNominal);
+    [WorstRatioMixedRobustVsNominal(iP,iB),WorstDayMixedRobustVsNominal(iP,iB)] = max(MixedRobustOverNominal);
+    
+    % Worst Days for Each Algorithm
+    [WorstRatioNominalTrueCostOverExpectedCost(iP,iB),WorstDayNominalTrueCostOverExpectedCost(iP,iB)] = max(NominalTrueCostOverExpectedCost);
+    [WorstRatioRobustLinftyTrueCostOverExpectedCost(iP,iB),WorstDayRobustLinftyTrueCostOverExpectedCost(iP,iB)] = max(RobustLinftyTrueCostOverExpectedCost);
+    [WorstRatioRobustMixedTrueCostOverExpectedCost(iP,iB),WorstDayRobustMixedTrueCostOverExpectedCost(iP,iB)] = max(NominalTrueCostOverExpectedCost);
+    
+    figure; subplot(3,1,1);
+    plot((NominalTrueCostOverExpectedCost-1)*100); hold all; grid on; title('Ratio of True Cost to Cost Predict via shortestpath[%]'); ylabel('Nominal');
+    subplot(3,1,2);
+    plot((RobustLinftyTrueCostOverExpectedCost-1)*100);hold all; grid on; ylabel('Robust L_{\infty}');
+    subplot(3,1,3);
+    plot((RobustMixedTrueCostOverExpectedCost-1)*100);hold all; grid on; ylabel('Robust Mixed');
+    xlabel('Day from January 14^{th} in 2004.');
+    
+    figure; subplot(2,1,1);
+    plot((LinftyRobustOverNominal-1)*100); hold all; grid on; title('Ratio of Robust Algorithm Costs to Nominal Algorithm Costs[%]'); ylabel('Robust L_{\infty}/Nominal');
+    subplot(2,1,2);
+    plot((MixedRobustOverNominal-1)*100);hold all; grid on; ylabel('Robust Mixed/Nominal');
+    xlabel('Day from January 14^{th} in 2004.');
+    
+    figure; plot(epsilons);
+    title('Maximum Approximation Error in Robust Mixed Algorithm[$].');
+    xlabel('Day from January 14^{th} in 2004.');
+    grid on; hold all;
   end
 end
 
@@ -296,6 +379,7 @@ function [decided_costs] = assignCostsInternal(...
   time_from, nTimesteps, stepsPerHour, timeStepSize)
 
 % Apply alpha:
+% 1kWh = 3.6e6J
 elecDemand = elecDemandMean + demandStandardEnvelope * elecDemandStd;
 heatDemand = heatDemandMean + demandStandardEnvelope * heatDemandStd;
 
@@ -315,23 +399,31 @@ function T = getNumTimesteps(dt, endTime)
   T = endTime * SECONDS_PER_HOUR / dt;    
 end
 
-function [elecTariffs, demands, NUM_WINDOWS] = getTariffsAndDemands(buildings)
-[CHP, NUM_WINDOWS] = LOAD_DEMAND_DATASETS();
+function [elecTariffs, demands_averaged, demands_true, NUM_WINDOWS] = getTariffsAndDemands(buildings)
+[CHP_averaged, CHP_nonAveraged, NUM_WINDOWS] = LOAD_DEMAND_DATASETS();
 
 %% Get all tariff & demand combinations
 nBuildings = numel(buildings);
 elecTariffs = cell(nBuildings, NUM_WINDOWS);
-demands = cell(nBuildings, NUM_WINDOWS);
+demands_averaged = cell(nBuildings, NUM_WINDOWS);
+demands_true = cell(nBuildings, NUM_WINDOWS);
 
-parfor b = 1:nBuildings
-  chp = CHP(b);
+for b = 1:nBuildings
+  chp = CHP_averaged(b);
   for d = 1:NUM_WINDOWS
-    do = chp.next(); demands{b,d} = do; % demand object
+    do = chp.next(); demands_averaged{b,d} = do; % demand object
     elecTariffs{b,d} = getSeasonalElectricityTariff(b, do.timeEnd);
   end
 end
+for b = 1:nBuildings
+  chp = CHP_nonAveraged(b);
+  for d = 1:NUM_WINDOWS
+    do = chp.next(); demands_true{b,d} = do; % demand object
+  end
+end
 % Unbox:
-demands = reshape([demands{:}], nBuildings, NUM_WINDOWS).';
+demands_averaged = reshape([demands_averaged{:}], nBuildings, NUM_WINDOWS).';
+demands_true = reshape([demands_true{:}], nBuildings, NUM_WINDOWS).';
 elecTariffs = reshape([elecTariffs{:}], nBuildings, NUM_WINDOWS).';
 end
 
@@ -357,30 +449,36 @@ price_kg_f = [0.401964000624002,0.459610000713491,0.353146667214886];
 price_kWh = [0.0350691841359548,0.0400984857368475,0.0308101359333970];
 end
 
-function [chp, nWindows] = LOAD_DEMAND_DATASETS()
+function [chp_averaged,chp_notAveraged, nWindows] = LOAD_DEMAND_DATASETS()
 % The code below creates 2-week averaging windows for the 5 building types, where
 % the first window is [02-Jan-2004 00:00:00, 16-Jan-2004 00:00:00] (because we don't have
 % data from the end of 2003 and we don't want to use the end of 2004 as a substitute).
-%{
-chp = [CHP2004Provider("../Data/RefBldgLargeHotelNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY),...
+
+chp_averaged = [CHP2004Provider("../Data/RefBldgLargeHotelNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY),...
        CHP2004Provider("../Data/RefBldgFullServiceRestaurantNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY),...
        CHP2004Provider("../Data/RefBldgSmallHotelNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY),...
        CHP2004Provider("../Data/USA_NY_New.York-Central.Park.725033_TMY3_HIGH.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY),...
        CHP2004Provider("../Data/RefBldgHospitalNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY)];     
 
+chp_notAveraged = [CHP2004Provider("../Data/RefBldgLargeHotelNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', 1*CHP2004Provider.DATAPOINTS_PER_DAY),...
+       CHP2004Provider("../Data/RefBldgFullServiceRestaurantNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', 1*CHP2004Provider.DATAPOINTS_PER_DAY),...
+       CHP2004Provider("../Data/RefBldgSmallHotelNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', 1*CHP2004Provider.DATAPOINTS_PER_DAY),...
+       CHP2004Provider("../Data/USA_NY_New.York-Central.Park.725033_TMY3_HIGH.csv", 'windowSize', 1*CHP2004Provider.DATAPOINTS_PER_DAY),...
+       CHP2004Provider("../Data/RefBldgHospitalNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', 1*CHP2004Provider.DATAPOINTS_PER_DAY)];   
+   
 startDay = datetime(2004, 1, 16); % skip the first two weeks
-arrayfun(@(x)x.fastForward(startDay, 'last'), chp);
+arrayfun(@(x)x.fastForward(startDay, 'last'), chp_averaged);
+arrayfun(@(x)x.fastForward(startDay, 'last'), chp_notAveraged);
 % Count how many times "next" can be called:
 nextCnt = 0; % Should be equal to: 365-14+1 = 352
-while (chp(1).hasNext)
+while (chp_averaged(1).hasNext)
   nextCnt = nextCnt + 1;
-  [~] = chp(1).next();
+  [~] = chp_averaged(1).next();
 end
+
 % Rewind again:
-arrayfun(@(x)x.fastForward(startDay, 'last'), chp);
-%}
-chp = struct2array(load('../Data/CHP2004.mat', 'chp'));
-nWindows = struct2array(load('../Data/CHP2004.mat', 'nextCnt'));
+arrayfun(@(x)x.fastForward(startDay, 'last'), chp_averaged);
+nWindows = nextCnt;
 end
 
 function [powerMap, heatMap, fuelMap, mdotFuelSU] = loadEngineMaps(expectedTotalNodes, dataPath)
