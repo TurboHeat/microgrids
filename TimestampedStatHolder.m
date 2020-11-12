@@ -16,8 +16,8 @@ classdef TimestampedStatHolder < handle
     % These will be either 1xN or 2xN depending on whether weekends are treated
     % separately, where N is the number of quantities being processed (typically 1 or 2,
     % for power and/or heat)
-    valMean
-    valStd
+    valMean = []
+    valStd = []
     % etc ...
   end % properties
   
@@ -62,23 +62,68 @@ classdef TimestampedStatHolder < handle
       tshObj.timeEnd = timeVec(end);
       
       if kwargs.separateWeekends
+        % In this case, 3D arrays will be returned, where the 1st slice represents
+        % weekday data, and the 2nd represents weekends.
+        SLICE_ID_WEEKDAYS = 1;
+        SLICE_ID_WEEKENDS = 2;
         we = TimestampedStatHolder.isweekend(timeVec, kwargs.friSatWeekend);
+        wd = ~we; % weekday
+        areWeekdaysInData = any(wd);
+        areWeekendsInData = any(we);
+        
         if kwargs.hourlyStats
-          [tshObj.valMean, tshObj.valStd, tshObj.hourOfVal] = ...
-            TimestampedStatHolder.hourlyWeightedMeanStd(timeVec(we), values(we, :), kwargs.weights(we));
-        else          
+          [~, tshObj.hourOfVal] = TimestampedStatHolder.findSameHourGroups(timeVec);           
+          if areWeekdaysInData
+            [tmpMean, tmpStd, tmpH] = TimestampedStatHolder.hourlyWeightedMeanStd(timeVec(wd), values(wd, :), kwargs.weights(wd));
+            tshObj.valMean(tshObj.hourOfVal == tmpH,:,SLICE_ID_WEEKDAYS) = tmpMean;
+            tshObj.valStd (tshObj.hourOfVal == tmpH,:,SLICE_ID_WEEKDAYS) = tmpStd;
+          else
+            [tshObj.valMean(:,:,SLICE_ID_WEEKDAYS), tshObj.valStd(:,:,SLICE_ID_WEEKDAYS)] = ...
+              deal(NaN(numel(tshObj.hourOfVal),size(values,2)));
+          end
+          
+          if areWeekendsInData
+            [tmpMean, tmpStd, tmpH] = TimestampedStatHolder.hourlyWeightedMeanStd(timeVec(we), values(we, :), kwargs.weights(we));
+            tshObj.valMean(tshObj.hourOfVal == tmpH,:,SLICE_ID_WEEKENDS) = tmpMean;
+            tshObj.valStd (tshObj.hourOfVal == tmpH,:,SLICE_ID_WEEKENDS) = tmpStd;
+          else
+            [tshObj.valMean(:,:,SLICE_ID_WEEKENDS), tshObj.valStd(:,:,SLICE_ID_WEEKENDS)] = ...
+              deal(NaN(numel(tshObj.hourOfVal),size(values,2)));
+          end          
+        else % average the entire dataset
+          ELEMS_IN_MEAN = 1; % 1 resulting value for 24 hours
           % Mean:
-          tshObj.valMean = [TimestampedStatHolder.weightedMean(values( we, :), kwargs.weights( we));
-                            TimestampedStatHolder.weightedMean(values(~we, :), kwargs.weights(~we))];
-          % Standard deviation:
-          tshObj.valStd = [TimestampedStatHolder.weightedStdev(values( we, :), kwargs.weights( we), tshObj.valMean(1), kwargs.biasCorrection);
-                           TimestampedStatHolder.weightedStdev(values(~we, :), kwargs.weights(~we), tshObj.valMean(2), kwargs.biasCorrection)];
+          if areWeekdaysInData
+            % Mean
+            tshObj.valMean(ELEMS_IN_MEAN,:,SLICE_ID_WEEKDAYS) = ...
+              TimestampedStatHolder.weightedMean(values(wd, :), kwargs.weights(wd));
+            % Standard deviation:
+            tshObj.valStd(ELEMS_IN_MEAN,:,SLICE_ID_WEEKDAYS) = ...
+              TimestampedStatHolder.weightedStdev(values(wd, :), kwargs.weights(wd), ...
+              tshObj.valMean(ELEMS_IN_MEAN,:,SLICE_ID_WEEKDAYS), kwargs.biasCorrection);
+          else
+            [tshObj.valMean(ELEMS_IN_MEAN,:,SLICE_ID_WEEKDAYS), tshObj.valStd(ELEMS_IN_MEAN,:,SLICE_ID_WEEKDAYS)] = ...
+              deal(NaN(ELEMS_IN_MEAN, size(values,2)));
+          end
+          
+          if areWeekendsInData
+            % Mean:
+            tshObj.valMean(ELEMS_IN_MEAN,:,SLICE_ID_WEEKENDS) = ...
+              TimestampedStatHolder.weightedMean(values(we, :), kwargs.weights(we));
+            % Standard deviation:
+            tshObj.valStd(ELEMS_IN_MEAN,:,SLICE_ID_WEEKENDS) = ...
+              TimestampedStatHolder.weightedStdev(values(we, :), kwargs.weights(we), ...
+              tshObj.valMean(ELEMS_IN_MEAN,:,SLICE_ID_WEEKENDS), kwargs.biasCorrection);
+          else
+            [tshObj.valMean(ELEMS_IN_MEAN,:,SLICE_ID_WEEKENDS), tshObj.valStd(ELEMS_IN_MEAN,:,SLICE_ID_WEEKENDS)] = ...
+              deal(NaN(ELEMS_IN_MEAN, size(values,2)));
+          end
         end
-      else
+      else % Do not split into weekdays and weekends
         if kwargs.hourlyStats
           [tshObj.valMean, tshObj.valStd, tshObj.hourOfVal] = ...
             TimestampedStatHolder.hourlyWeightedMeanStd(timeVec, values, kwargs.weights);          
-        else
+        else % Average data from all hours into a single value:
           % Mean:
           tshObj.valMean = TimestampedStatHolder.weightedMean(values, kwargs.weights);
           % Standard deviation:
@@ -87,8 +132,8 @@ classdef TimestampedStatHolder < handle
       end
       
       if kwargs.periodicOutput
-        tshObj.valMean = tshObj.valMean([1:end,1],:);
-        tshObj.valStd = tshObj.valStd([1:end,1],:);
+        tshObj.valMean = tshObj.valMean([1:end,1],:,:);
+        tshObj.valStd = tshObj.valStd([1:end,1],:,:);
         tshObj.hourOfVal(end+1) = 24;
       end
     end % constructor
@@ -96,27 +141,29 @@ classdef TimestampedStatHolder < handle
   end % public methods
   
   methods (Access = protected, Static = true)
+    function [g, uh] = findSameHourGroups(timestamps)
+      h = timestamps.Hour;
+      [g,uh] = findgroups(h);
+    end
+    
     function [meanValsVec, stdValsVec, uh] = hourlyWeightedMeanStd(timestamps, values, weights)
       % This function produces hourly weighted averages of the provided values
       % It is assumed that weekends have been included/excluded in advance     
-      h = timestamps.Hour;
-      [g,uh] = findgroups(h);
+      [g,uh] = TimestampedStatHolder.findSameHourGroups(timestamps);
       [meanValsVec,stdValsVec] = splitapply(@TimestampedStatHolder.wMeanAndStd, values, weights, g);      
     end    
     
     function [meanValsVec, h] = hourlyWeightedMean(timestamps, values, weights)
       % This function produces hourly weighted averages of the provided values
       % It is assumed that weekends have been included/excluded in advance    
-      h = timestamps.Hour;
-      g = findgroups(h);
+      g = TimestampedStatHolder.findSameHourGroups(timestamps);
       meanValsVec = splitapply(@TimestampedStatHolder.weightedMean, values, weights, g);      
     end
     
     function [stdValsVec, h] = hourlyWeightedStd(timestamps, values, weights)
       % This function produces hourly weighted standard deviations of the provided values
       % It is assumed that weekends have been included/excluded in advance   
-      h = timestamps.Hour;
-      g = findgroups(h);
+      g = TimestampedStatHolder.findSameHourGroups(timestamps);
       stdValsVec = splitapply(@TimestampedStatHolder.weightedStdev, values, weights, g);      
     end
     

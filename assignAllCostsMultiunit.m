@@ -29,7 +29,7 @@ BUILDING = [1, 2, 3, 4];
 DAY      = [1 2 3];
 buildingstring = {'Large Hotel', 'Full Service Restaraunt', 'Small Hotel', 'Residential'}; %for plotting
 daystring = {'Winter', 'Spring/Autumn', 'Summer'}; %for plotting
-
+transitionPenalty = 0.01;
 %% Get all tariff combinations
 %[Building; day]
 tariff_map = uint8([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4; 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]).';
@@ -148,7 +148,7 @@ decided_costs = zeros(length(to_state_map), numel(BUILDING)*numel(DAY)*numel(pri
 for cost = 1:numel(price_kg_f)
   fuel_price = price_kg_f(cost);
   for i = 1:numel(BUILDING) * numel(DAY)
-    decided_costs(:, k) = assignCostsMultiunit(double(dt), fuel_map, mdot_fuel_SU, total_nodes, sol_select, n_tsteps, from_state_map, to_state_map, fuel_price, is_transition);
+    decided_costs(:, k) = assignCostsMultiunit(double(dt), fuel_map, mdot_fuel_SU, total_nodes, sol_select, n_tsteps, from_state_map, to_state_map, fuel_price, is_transition,transitionPenalty);
     k = k + 1;
   end
 end
