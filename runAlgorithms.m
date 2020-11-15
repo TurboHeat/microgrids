@@ -24,7 +24,7 @@ MixedSpikeAlphas = [.5*sqrt(5760)*ones(1,11),...
 %price is PriceIndices(i).
 %
 %The building type should be in the set {1,2,3,4}, and the price index
-%should be in the set {1,2,3}
+%should be in the set {1 ... numFuelPrices}
 BuildingTypes = [1,2,3,4,1,2,3,4,1,2,3,4];
 PriceIndices  = [1,1,1,1,2,2,2,2,3,3,3,3];
 

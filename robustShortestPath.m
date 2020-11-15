@@ -427,28 +427,6 @@ demands_true = reshape([demands_true{:}], nBuildings, NUM_WINDOWS).';
 elecTariffs = reshape([elecTariffs{:}], nBuildings, NUM_WINDOWS).';
 end
 
-function [price_kg_f, price_kWh] = NATURAL_GAS_PARAMS()
-% This function contains some computations using constants. There is no need to perform
-% them each time, so instead the end result is returned.
-%{
-Qr = 49736500;   % [J/kg]
-h_env = 3.015e5; % [J/kg]
-h_100 = 3.9748e5;% [J/kg]
-eta_HRU = 0.89;
-eta_b = 0.98;
-mair_mf = 17.2 * 1.2;
-Ph_mf = eta_HRU * (mair_mf + 1) * ((Qr * eta_b + mair_mf * h_env) / (mair_mf + 1) - h_100) / 3.6e6; %kWh/kg
-price_ft3 = [7.74, 8.85, 6.80]; % $/1000ft^3
-density_CH4 = 0.68; % kg/m^3
-ft3_m3 = power(0.3048, 3);
-price_m3 = price_ft3 ./ (1000 * ft3_m3); %price in $/m^3
-price_kg_f = price_m3 / density_CH4; % for MGT costs
-price_kWh = price_kg_f / Ph_mf; % price in $/kWh, for heat tariff
-%}
-price_kg_f = [0.401964000624002,0.459610000713491,0.353146667214886];
-price_kWh = [0.0350691841359548,0.0400984857368475,0.0308101359333970];
-end
-
 function [chp_averaged,chp_notAveraged, nWindows] = LOAD_DEMAND_DATASETS()
 % The code below creates 2-week averaging windows for the 5 building types, where
 % the first window is [02-Jan-2004 00:00:00, 16-Jan-2004 00:00:00] (because we don't have
