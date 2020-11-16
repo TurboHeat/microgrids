@@ -1,4 +1,8 @@
 function [allScenariosData] = runAlgorithms(fuelIdx)
+%% Constants
+OUTPUT_FOLDER = "../Data/Results";
+if ~isfolder(OUTPUT_FOLDER), mkdir(OUTPUT_FOLDER); end
+
 %% Choose Running Algorithms
 runBenchmark = 1;
 
@@ -28,8 +32,14 @@ mixedSpikeAlphas = [.5*sqrt(5760)*ones(1,11),...
 %should be in the set {1 ... numFuelPrices}
 BUILDINGS_TO_TEST = BuildingType(1:4);
 nBuildTypes = numel(BUILDINGS_TO_TEST);
-nFuelPrices = numel( NATURAL_GAS_PARAMS() );
+nFuelPrices = numel(NATURAL_GAS_PARAMS());
 [buildingTypes, priceIndices] = getCaseIndices(nBuildTypes, nFuelPrices);
+
+if nargin > 0 && ~isempty(fuelIdx)
+  keepIdx = priceIndices == fuelIdx;
+  priceIndices = priceIndices(keepIdx);
+  buildingTypes = buildingTypes(keepIdx);  
+end
 
 %% Assert and initilize variables
 
@@ -51,8 +61,8 @@ numAlgorithms = numel(algorithmList);
 
 [scenarios, algorithms] = meshgrid(scenarioList, algorithmList);
 numPairs = numel(scenarios);
-scenarios = reshape(scenarios,[numPairs,1]);
-algorithms = reshape(algorithms,[numPairs,1]);
+scenarios = scenarios(:);
+algorithms = algorithms(:);
 
 %-1 = Benchmark. 0 = Nominal. 1 = Robust Linfty.  2 = Robust Mixed.
 algorithmTypeKey = [-ones(runBenchmark,1);
@@ -75,18 +85,19 @@ outputData(numPairs).Data.AlgorithmParameters{1} = [];
 
 outputData(numPairs).BuildingType = 0;
 outputData(numPairs).PriceIndex = 0;
-%% Run Algorithms on Scenarios
 
+%% Run Algorithms on Scenarios
 parfor iter = 1:numel(scenarios)
+  tv = tic();
   jScenario = scenarios(iter);
   iAlgorithm = algorithms(iter);
-  AlgType = algorithmType(iter);
-  AlgParam = algorithmParameters(iter);
+  algType = algorithmType(iter);
+  algParam = algorithmParameters(iter);
   
   building = buildingTypes(jScenario);
   priceInd = priceIndices(jScenario);
   
-  switch AlgType
+  switch algType
     case -1
       out = runBenchmarkAlgorithm('PriceIndex',priceInd,...
         'BuildingType', building);
@@ -96,17 +107,19 @@ parfor iter = 1:numel(scenarios)
     case 1
       out = runRobustLinftyAlgorithm('PriceIndex',priceInd,...
         'BuildingType', building,...
-        'alpha', LinftyAlphas(AlgParam));
+        'alpha', LinftyAlphas(algParam));
     case 2
       out = runRobustMixedAlgorithm('PriceIndex',priceInd,...
         'BuildingType',building,...
-        'alphaMixed', mixedAlphas(AlgParam),...
-        'alphaSpikes', mixedSpikeAlphas(AlgParam));
+        'alphaMixed', mixedAlphas(algParam),...
+        'alphaSpikes', mixedSpikeAlphas(algParam));
   end
-  
+  fName = makeFilename(iter, algType, algParam, building, priceInd);
+  parsave(fullfile(OUTPUT_FOLDER, fName), out, iter, algType, algParam, building, priceInd);
   outputData(iter).Data = out;
   outputData(iter).BuildingType = building;  
   outputData(iter).PriceIndex = priceInd;
+  disp("Iteration #" + iter + " took " + toc(tv));
 end
 
 %% Parse to a new form, which is easier to analyze
@@ -134,7 +147,17 @@ for jScenario = 1:numScenarios
 end
 end
 
+function parsave(fName, outputData, iter, algType, algParam, buildingId, fuelPriceId)  
+  save(fName, 'outputData', 'iter', 'algType', 'algParam', 'buildingId', 'fuelPriceId');
+end
+
 function [buildIdx, priceIdx] = getCaseIndices(nBuildings, nFuelPrices)
 buildIdx = repmat(1:nBuildings, 1, nFuelPrices);
 priceIdx = repelem(1:nFuelPrices, 1, nBuildings);
+end
+
+function [nameStr] = makeFilename(iter, algType, algParams, bldgTypeId, fuelPriceId)
+% Returns the name of the file into which to save intermediate results.
+nameStr = compose("I%04u_AT%02d_AP%03u_B%1u_F%1u.mat", ...
+  iter, algType, algParams, bldgTypeId, fuelPriceId);
 end
