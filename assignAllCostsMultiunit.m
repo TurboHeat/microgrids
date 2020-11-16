@@ -37,8 +37,8 @@ elec_tariff = zeros(T, numel(BUILDING)*numel(DAY));
 power_demand = zeros(T, numel(BUILDING)*numel(DAY));
 heat_demand = zeros(T, numel(BUILDING)*numel(DAY));
 i = 1;
-for b = 1:length(BUILDING)
-  for d = 1:length(DAY)
+for b = 1:numel(BUILDING)
+  for d = 1:numel(DAY)
     elec_tariff(:, i) = createElectricityTariffProfile(b, d, dt);
     [power_demand(:, i), heat_demand(:, i)] = createDemandProfileVector(b, d, dt);
     % SMOOTHING
@@ -144,7 +144,7 @@ is_transition = [zeros(total_nodes,1);...
     zeros(total_nodes,1)]; %checks equality of V values
 %% Main loop to assign edges
 k = 1;
-decided_costs = zeros(length(to_state_map), numel(BUILDING)*numel(DAY)*numel(price_kg_f));
+decided_costs = zeros(numel(to_state_map), numel(BUILDING)*numel(DAY)*numel(price_kg_f));
 for cost = 1:numel(price_kg_f)
   fuel_price = price_kg_f(cost);
   for i = 1:numel(BUILDING) * numel(DAY)

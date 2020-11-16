@@ -245,7 +245,7 @@ for iP = 1:nPrices
       V_costs = zeros(nTrs,1);
       V_paths = cell(nTrs,1);
       V_edge_paths = cell(nTrs,1);
-      g_Mixed = digraph(g.Edges.EndNodes(:,1), g.Edges.EndNodes(:,2), 1:length(g.Edges.EndNodes(:,1)));
+      g_Mixed = digraph(g.Edges.EndNodes(:,1), g.Edges.EndNodes(:,2), 1:numel(g.Edges.EndNodes(:,1)));
       % Retrieve the index list of the edges - saves time later when changing weights.
       edgePermutationMap = g_Mixed.Edges.Weight;
       for iT = 1:nTrs

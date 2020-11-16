@@ -42,7 +42,7 @@ if ~exist('joule2kWh', 'var')
   joule2kWh = 1 / 3.6e6; %1kWh=3.6e6J
 end
 if ~exist('fuel_index', 'var')
-  DayBuildingCombinations = length(DAY) * length(BUILDING);
+  DayBuildingCombinations = numel(DAY) * numel(BUILDING);
   fuel_index = [1 * ones(DayBuildingCombinations, 1); 2 * ones(DayBuildingCombinations, 1); 3 * ones(DayBuildingCombinations, 1)]; %Type of fuel in various iterations.
 end
 
@@ -69,30 +69,30 @@ mdot_MGTs = cell(n_MGTs, 1);
 graphs_MGTs = cell(n_MGTs, 1);
 
 for mgt = 1:n_MGTs
-  power_MGTs{mgt} = zeros(T, length(fuel_index));
-  heat_MGTs{mgt} = zeros(T, length(fuel_index));
-  mdot_MGTs{mgt} = zeros(T, length(fuel_index));
+  power_MGTs{mgt} = zeros(T, numel(fuel_index));
+  heat_MGTs{mgt} = zeros(T, numel(fuel_index));
+  mdot_MGTs{mgt} = zeros(T, numel(fuel_index));
 end
 
-path_cost = zeros(n_MGTs, length(fuel_index));
+path_cost = zeros(n_MGTs, numel(fuel_index));
 
 power_MGT_Total = zeros(T, 1);
 heat_MGT_Total = zeros(T, 1);
-base_electricity_charge = zeros(1, length(fuel_index));
-base_heat_charge = zeros(1, length(fuel_index));
-total_charge = zeros(1, length(fuel_index));
-new_demand = zeros(T, length(fuel_index));
-bought_elec = zeros(1, length(fuel_index));
-sold_energy = zeros(1, length(fuel_index));
-bought_fuel = zeros(1, length(fuel_index));
-bought_heat = zeros(1, length(fuel_index));
-MGT_cost = zeros(1, length(fuel_index));
-savings = zeros(1, length(fuel_index));
-FC = zeros(1, length(fuel_index));
-MGT_PDC = zeros(1, length(fuel_index));
-ut_PDC = zeros(1, length(fuel_index));
-MGT_IDC = zeros(1, length(fuel_index));
-ut_IDC = zeros(1, length(fuel_index));
+base_electricity_charge = zeros(1, numel(fuel_index));
+base_heat_charge = zeros(1, numel(fuel_index));
+total_charge = zeros(1, numel(fuel_index));
+new_demand = zeros(T, numel(fuel_index));
+bought_elec = zeros(1, numel(fuel_index));
+sold_energy = zeros(1, numel(fuel_index));
+bought_fuel = zeros(1, numel(fuel_index));
+bought_heat = zeros(1, numel(fuel_index));
+MGT_cost = zeros(1, numel(fuel_index));
+savings = zeros(1, numel(fuel_index));
+FC = zeros(1, numel(fuel_index));
+MGT_PDC = zeros(1, numel(fuel_index));
+ut_PDC = zeros(1, numel(fuel_index));
+MGT_IDC = zeros(1, numel(fuel_index));
+ut_IDC = zeros(1, numel(fuel_index));
 
 %% Trick for Graphs of Tubrines
 % It is much quicker to change the edge weights by calling g.Edges.Weight
@@ -114,7 +114,7 @@ for mgt = 1:n_MGTs
 end
 
 %% Run the solution method - iterate over all day-building-fuel cost combinations.
-for i = 1:length(fuel_index)
+for i = 1:numel(fuel_index)
   d_index = mod(i, 12) + (mod(i, 12) == 0) * 12;
   %d_index is the day-building combination:
   %1 - Large Hotel, Winter
@@ -289,7 +289,7 @@ for i = 1:length(fuel_index)
       t_plot, heat_MGTs{4}(:, i)/1e3, 'LineWidth', 2);
     
     h3 = figure(5);
-    plot(1:length(lambda_hist), lambda_hist, 'LineWidth', 2);
+    plot(1:numel(lambda_hist), lambda_hist, 'LineWidth', 2);
     legend('\lambda_{t=1}^p vs. iteration');
     ylabel('\lambda');
     xlabel('Iteration');

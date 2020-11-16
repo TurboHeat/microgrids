@@ -134,14 +134,14 @@ for i = 1:numel(fuel_index)
       otherwise
           error('Unsupported Approximation Type');
   end
-  if(length(Thresholds) > length(unique_W_spike))
+  if(numel(Thresholds) > numel(unique_W_spike))
       Thresholds = unique_W_spike;
   end 
-  V_costs = zeros(length(Thresholds),1);
-  V_paths = cell(length(Thresholds),1);
-  V_edge_paths = cell(length(Thresholds),1);
+  V_costs = zeros(numel(Thresholds),1);
+  V_paths = cell(numel(Thresholds),1);
+  V_edge_paths = cell(numel(Thresholds),1);
   g_Mixed = digraph(state_from, state_to, decided_costs_robust_mixed_nospike(:, i));
-  for j=1:length(Thresholds)
+  for j=1:numel(Thresholds)
       Weights = (W_spike <= Thresholds(j)).*decided_costs_robust_mixed_nospike(:, i) + (W_spike > Thresholds(j)).*inf;
       g_Mixed.Edges.Weight = Weights(EdgePermutationMap);
       [V_paths{j}, path_cost, edge_path] = shortestpath(g_Mixed, 1, max(state_to), 'Method', 'acyclic');

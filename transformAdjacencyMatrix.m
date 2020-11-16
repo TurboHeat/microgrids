@@ -31,17 +31,17 @@ ToTerminalNodeIndices = (state_to == TerminalNode);
 FromRegularNodeIndices = ~FromSourceNodeIndices;
 ToRegularNodeIndices = ~ToTerminalNodeIndices;
 
-from_state_map(FromSourceNodeIndices) = length(SV_states); %(0,0)
-to_state_map(ToTerminalNodeIndices) = length(SV_states); %(0,0)
+from_state_map(FromSourceNodeIndices) = numel(SV_states); %(0,0)
+to_state_map(ToTerminalNodeIndices) = numel(SV_states); %(0,0)
 
 %Shift state_from and state_to:
 state_from(FromRegularNodeIndices) = state_from(FromRegularNodeIndices) - 1;
 state_to(ToRegularNodeIndices) = state_to(ToRegularNodeIndices) - 1;
 
-from_state_map(FromRegularNodeIndices) = mod(state_from(FromRegularNodeIndices)-1, length(SV_states));
-to_state_map(ToRegularNodeIndices) = mod(state_to(ToRegularNodeIndices)-1, length(SV_states));
-from_state_map(from_state_map == 0) = length(SV_states);
-to_state_map(to_state_map == 0) = length(SV_states);
+from_state_map(FromRegularNodeIndices) = mod(state_from(FromRegularNodeIndices)-1, numel(SV_states));
+to_state_map(ToRegularNodeIndices) = mod(state_to(ToRegularNodeIndices)-1, numel(SV_states));
+from_state_map(from_state_map == 0) = numel(SV_states);
+to_state_map(to_state_map == 0) = numel(SV_states);
 
 % Determine the starting and ending times of a transition.
 time_from = zeros(size(state_from));
@@ -50,8 +50,8 @@ time_to = zeros(size(state_to));
 time_from(FromSourceNodeIndices) = 0;
 time_to(ToTerminalNodeIndices) = intmax('uint16');
 
-time_from(FromRegularNodeIndices) = floor((state_from(FromRegularNodeIndices) - 0.5)/(length(SV_states))) + 1;
-time_to(ToRegularNodeIndices) = floor((state_to(ToRegularNodeIndices) - 0.5)/(length(SV_states))) + 1;
+time_from(FromRegularNodeIndices) = floor((state_from(FromRegularNodeIndices) - 0.5)/(numel(SV_states))) + 1;
+time_to(ToRegularNodeIndices) = floor((state_to(ToRegularNodeIndices) - 0.5)/(numel(SV_states))) + 1;
 
 n_tsteps = time_to - time_from; %dT
 end

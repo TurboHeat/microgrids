@@ -30,21 +30,21 @@ PriceIndices  = [1,1,1,1,2,2,2,2,3,3,3,3];
 
 %% Assert and initilize variables
 
-assert(length(BuildingTypes) == length(PriceIndices), ...
+assert(numel(BuildingTypes) == numel(PriceIndices), ...
        'Incompatible number of building types and gas price indices.');
    
-assert(length(MixedAlphas) == length(MixedSpikeAlphas), ...
+assert(numel(MixedAlphas) == numel(MixedSpikeAlphas), ...
        'Incompatible number of parameters for robust mixed algorithm.');
    
-numScenarios = length(BuildingTypes);
-numRobustLinfty = length(LinftyAlphas);
-numRobustMixed = length(MixedAlphas);
+numScenarios = numel(BuildingTypes);
+numRobustLinfty = numel(LinftyAlphas);
+numRobustMixed = numel(MixedAlphas);
 
 % Prepare arrays to allow a single itertor to go over all
 % algorithm-scenario pairs.
 ScenarioList = 1:numScenarios;
 AlgorithmList = 1:(1*runBenchmark + 1*runNominal + numRobustLinfty*runRobustLinfty + numRobustMixed *runRobustMixed);
-numAlgorithms = length(AlgorithmList);
+numAlgorithms = numel(AlgorithmList);
 
 [Scenarios,Algorithms] = meshgrid(ScenarioList,AlgorithmList);
 numPairs = numel(Scenarios);
@@ -71,7 +71,7 @@ OutputData(numPairs).BuildingType = 0;
 OutputData(numPairs).PriceIndex = 0;
 %% Run Algorithms on Scenarios
 
-parfor iter = 1:length(Scenarios)
+parfor iter = 1:numel(Scenarios)
     jScenario = Scenarios(iter);
     iAlgorithm = Algorithms(iter);
     AlgType = AlgorithmType(iter);
