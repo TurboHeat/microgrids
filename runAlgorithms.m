@@ -43,7 +43,7 @@ if nargin > 0 && ~isempty(fuelIdx)
   tsdisp("Only fuelIdx = " + mat2str(fuelIdx) + " will be considered!")
   keepIdx = priceIndices == fuelIdx;
   priceIndices = priceIndices(keepIdx);
-  buildingTypes = buildingTypes(keepIdx);  
+  buildingTypes = buildingTypes(keepIdx);
 else
   tsdisp("All " + nFuelPrices + " fuelIdx will be considered!")
 end
@@ -98,7 +98,7 @@ nSc = numel(scenarios);
 if batchStartupOptionUsed() || isempty(gcp('nocreate'))
   % In case of batch execution (running on a cluster)
   parfor iter = 1:nSc
-    tv = tic();
+    % Unpack scenario configurations:
     jScenario = scenarios(iter);
     iAlgorithm = algorithms(iter);
     algType = algorithmType(iter);
@@ -106,7 +106,19 @@ if batchStartupOptionUsed() || isempty(gcp('nocreate'))
 
     building = buildingTypes(jScenario);
     priceInd = priceIndices(jScenario);
-
+    
+    % Determine if we need to compute the current file:
+    fName = makeFilename(iter, algType, algParam, building, priceInd);
+    fPath = fullfile(OUTPUT_FOLDER, fName);
+    if isfile(fPath)
+      tsdisp(fName + " already exists - skipping.");
+      continue
+    else
+      tsdisp("Starting work on: " + fName);
+    end
+    
+    % Perform the computation
+    tv = tic();
     switch algType
       case -1
         out = runBenchmarkAlgorithm('PriceIndex',priceInd,...
@@ -124,8 +136,8 @@ if batchStartupOptionUsed() || isempty(gcp('nocreate'))
           'alphaMixed', mixedAlphas(algParam),...
           'alphaSpikes', mixedSpikeAlphas(algParam));
     end
-    fName = makeFilename(iter, algType, algParam, building, priceInd);
-    parsave(fullfile(OUTPUT_FOLDER, fName), out, iter, algType, algParam, building, priceInd);
+    
+    parsave(fPath, out, iter, algType, algParam, building, priceInd);
     outputData(iter).Data = out;
     outputData(iter).BuildingType = building;  
     outputData(iter).PriceIndex = priceInd;
@@ -134,7 +146,7 @@ if batchStartupOptionUsed() || isempty(gcp('nocreate'))
 else  
   ppm = ParforProgressbar(nSc);
   parfor iter = 1:nSc
-    tv = tic();
+    % Unpack scenario configurations:
     jScenario = scenarios(iter);
     iAlgorithm = algorithms(iter);
     algType = algorithmType(iter);
@@ -142,7 +154,19 @@ else
 
     building = buildingTypes(jScenario);
     priceInd = priceIndices(jScenario);
-
+    
+    % Determine if we need to compute the current file:
+    fName = makeFilename(iter, algType, algParam, building, priceInd);
+    fPath = fullfile(OUTPUT_FOLDER, fName);
+    if isfile(fPath)
+      tsdisp(fName + " already exists - skipping.");
+      continue
+    else
+      tsdisp("Starting work on: " + fName);
+    end
+    
+    % Perform the computation
+    tv = tic();
     switch algType
       case -1
         out = runBenchmarkAlgorithm('PriceIndex',priceInd,...
@@ -173,6 +197,7 @@ end
 % Restore previous warning state:
 warning(ws);
 %% Parse to a new form, which is easier to analyze
+%% TODO: Perform as part of a separate post-processing script
 % Initialize Structure - the values have no meaning, only the data
 % structure.
 currentScenarioData(numAlgorithms) = outputData(1).Data;
@@ -208,6 +233,8 @@ end
 
 function [nameStr] = makeFilename(iter, algType, algParams, bldgTypeId, fuelPriceId)
 % Returns the name of the file into which to save intermediate results.
+% NOTE: The formatspec may need to be modified if the simulation grid is modified
+%       significantly (e.g., more than 1E4-1 iterations).
 nameStr = compose("I%04u_AT%02d_AP%03u_B%1u_F%1u.mat", ...
   iter, algType, algParams, bldgTypeId, fuelPriceId);
 end
