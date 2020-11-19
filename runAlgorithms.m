@@ -94,6 +94,12 @@ outputData(numPairs).BuildingType = 0;
 outputData(numPairs).PriceIndex = 0;
 
 %% Run Algorithms on Scenarios
+% Initialize parallel pool:
+ts = datetime('now');
+results = string(strsplit(evalc("parpool('local');"), '\n'));
+tsdisp(results(1), ts);
+tsdisp(results(2));
+
 nSc = numel(scenarios);
 if batchStartupOptionUsed() || isempty(gcp('nocreate'))
   % In case of batch execution (running on a cluster)
@@ -239,6 +245,10 @@ nameStr = compose("I%04u_AT%02d_AP%03u_B%1u_F%1u.mat", ...
   iter, algType, algParams, bldgTypeId, fuelPriceId);
 end
 
-function [] = tsdisp(msg)
-  disp(datestr(datetime('now'),"[dd-mm-yyyy HH:MM:SS.FFF] ") + msg);
+function [] = tsdisp(msg, ts)
+arguments
+  msg (1,1) string
+  ts (1,1) datetime = datetime('now')
+end
+  disp(datestr(ts,"[dd-mm-yyyy HH:MM:SS.FFF] ") + msg);
 end
