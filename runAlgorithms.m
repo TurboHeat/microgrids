@@ -87,8 +87,47 @@ outputData(numPairs).BuildingType = 0;
 outputData(numPairs).PriceIndex = 0;
 
 %% Run Algorithms on Scenarios
-parfor iter = 1:numel(scenarios)
-  tv = tic();
+nSc = numel(scenarios);
+if batchStartupOptionUsed() || isempty(gcp('nocreate'))
+  % In case of batch execution (running on a cluster)
+  parfor iter = 1:nSc
+    tv = tic();
+    jScenario = scenarios(iter);
+    iAlgorithm = algorithms(iter);
+    algType = algorithmType(iter);
+    algParam = algorithmParameters(iter);
+
+    building = buildingTypes(jScenario);
+    priceInd = priceIndices(jScenario);
+
+    switch algType
+      case -1
+        out = runBenchmarkAlgorithm('PriceIndex',priceInd,...
+          'BuildingType', building);
+      case 0
+        out = runNominalAlgorithm('PriceIndex',priceInd,...
+          'BuildingType', building);
+      case 1
+        out = runRobustLinftyAlgorithm('PriceIndex',priceInd,...
+          'BuildingType', building,...
+          'alpha', LinftyAlphas(algParam));
+      case 2
+        out = runRobustMixedAlgorithm('PriceIndex',priceInd,...
+          'BuildingType',building,...
+          'alphaMixed', mixedAlphas(algParam),...
+          'alphaSpikes', mixedSpikeAlphas(algParam));
+    end
+    fName = makeFilename(iter, algType, algParam, building, priceInd);
+    parsave(fullfile(OUTPUT_FOLDER, fName), out, iter, algType, algParam, building, priceInd);
+    outputData(iter).Data = out;
+    outputData(iter).BuildingType = building;  
+    outputData(iter).PriceIndex = priceInd;
+    disp("Iteration #" + iter + " took " + toc(tv));
+  end
+else  
+  ppm = ParforProgressbar(nSc);
+  parfor iter = 1:nSc
+    tv = tic();
   jScenario = scenarios(iter);
   iAlgorithm = algorithms(iter);
   algType = algorithmType(iter);
@@ -120,6 +159,9 @@ parfor iter = 1:numel(scenarios)
   outputData(iter).BuildingType = building;  
   outputData(iter).PriceIndex = priceInd;
   disp("Iteration #" + iter + " took " + toc(tv));
+    ppm.increment();
+  end
+  delete(ppm);  
 end
 
 %% Parse to a new form, which is easier to analyze
