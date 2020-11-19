@@ -36,10 +36,12 @@ nFuelPrices = numel(NATURAL_GAS_PARAMS());
 [buildingTypes, priceIndices] = getCaseIndices(nBuildTypes, nFuelPrices);
 
 if nargin > 0 && ~isempty(fuelIdx)
-  disp("Only fuelIdx = " + mat2str(fuelIdx) + " will be considered!")
+  tsdisp("Only fuelIdx = " + mat2str(fuelIdx) + " will be considered!")
   keepIdx = priceIndices == fuelIdx;
   priceIndices = priceIndices(keepIdx);
   buildingTypes = buildingTypes(keepIdx);  
+else
+  tsdisp("All " + nFuelPrices + " fuelIdx will be considered!")
 end
 
 %% Assert and initilize variables
@@ -123,7 +125,7 @@ if batchStartupOptionUsed() || isempty(gcp('nocreate'))
     outputData(iter).Data = out;
     outputData(iter).BuildingType = building;  
     outputData(iter).PriceIndex = priceInd;
-    disp("Iteration #" + iter + " took " + toc(tv));
+    tsdisp("Iteration #" + iter + " took " + toc(tv));
   end
 else  
   ppm = ParforProgressbar(nSc);
@@ -203,4 +205,8 @@ function [nameStr] = makeFilename(iter, algType, algParams, bldgTypeId, fuelPric
 % Returns the name of the file into which to save intermediate results.
 nameStr = compose("I%04u_AT%02d_AP%03u_B%1u_F%1u.mat", ...
   iter, algType, algParams, bldgTypeId, fuelPriceId);
+end
+
+function [] = tsdisp(msg)
+  disp(datestr(datetime('now'),"[dd-mm-yyyy HH:MM:SS.FFF] ") + msg);
 end
