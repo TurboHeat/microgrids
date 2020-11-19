@@ -1,6 +1,12 @@
 %% Constants:
-FUEL_INDEX = repelem(1:3, 1, 12).';
+% Fuel
 [PRICE_kg_f, HEAT_TARIFF] = NATURAL_GAS_PARAMS();
+NUM_FUEL_PRICES = numel(PRICE_kg_f);
+% Buildings
+BUILDINGS = BuildingType(1:4);
+NUM_BUILDINGS = numel(BUILDINGS);
+FUEL_INDEX = repelem(1:NUM_FUEL_PRICES, 1, NUM_FUEL_PRICES*NUM_BUILDINGS).';
+
 SECONDS_PER_MINUTE = 60;
 MINUTES_PER_HOUR = 60;
 SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
@@ -8,9 +14,6 @@ NO_ENVELOPE_ALPHA = 0;
 NODES_CONNECTED_TO_ARTIFICIAL_START = 1;
 NO_STATE_TRANSITION_PENALTY = 0;
 % NO_DEMAND = zeros(T,1); - defined later, as T is only defined later.
-% Buildings
-BUILDINGS = BuildingType(1:4);
-NUM_BUILDINGS = numel(BUILDINGS);
 
 %% Initialization
 stepsPerHour = SECONDS_PER_HOUR / timeStepSize; % number of time steps in 1h
@@ -36,9 +39,9 @@ NO_DEMAND = zeros(T,1);
 
 % Select the correct column with the final price
 sol_select = [~SV_states(stateFromMap, 1) & ~SV_states(stateToMap, 1), ... % Off-off
-  ~SV_states(stateFromMap, 1) & SV_states(stateToMap, 1), ... % Start up
-  ~SV_states(stateToMap, 1), ... % Shut down
-  true(numel(nTimesteps), 1)]; % Remaining transitions
+              ~SV_states(stateFromMap, 1) & SV_states(stateToMap, 1), ... % Start up
+              ~SV_states(stateToMap, 1), ... % Shut down
+              true(numel(nTimesteps), 1)]; % Remaining transitions
 [~, sol_select] = max(sol_select, [], 2);
 
 % Assign a small penalty to every input (s,v) change
