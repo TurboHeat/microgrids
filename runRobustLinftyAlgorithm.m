@@ -35,7 +35,8 @@ iP = kwargs.PriceIndex;
 iB = kwargs.BuildingType;
 
 %% Load Parameters 
-LoadParametersForRobustAlgorithms();
+loadParametersForRobustAlgorithms; % this is a script - VERY BAD PRACTICE!!!
+% Calling this in a loop is even worse, because many files are read from the hard-drive inside
 
 %% Initialize Variables
 % Output Data

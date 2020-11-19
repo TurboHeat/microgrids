@@ -20,7 +20,7 @@ iP = kwargs.PriceIndex;
 iB = kwargs.BuildingType;
 
 %% Load Parameters 
-LoadParametersForRobustAlgorithms();
+loadParametersForRobustAlgorithms();
 
 %% Initialize Variables
 % Output Data

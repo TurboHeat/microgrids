@@ -32,8 +32,8 @@ epsilon = kwargs.epsilon;
 iP = kwargs.PriceIndex;
 iB = kwargs.BuildingType;
 %% Load Parameters 
-LoadParametersForRobustAlgorithms();
-
+loadParametersForRobustAlgorithms; % this is a script - VERY BAD PRACTICE!!!
+% Calling this in a loop is even worse, because many files are read from the hard-drive inside
 
 %% Initialize Variables
 % Output Data
@@ -124,7 +124,7 @@ for iW = 1:NUM_WINDOWS
     V_costs = zeros(nTrs,1);
     V_paths = cell(nTrs,1);
     V_edge_paths = cell(nTrs,1);
-    g = digraph(g.Edges.EndNodes(:,1), g.Edges.EndNodes(:,2), 1:length(g.Edges.EndNodes(:,1)));
+    g = digraph(g.Edges.EndNodes(:,1), g.Edges.EndNodes(:,2), 1:numel(g.Edges.EndNodes(:,1)));
     % Retrieve the index list of the edges - saves time later when changing weights.
     edgePermutationMap = g.Edges.Weight;
     for iT = 1:nTrs

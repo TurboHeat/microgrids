@@ -10,10 +10,10 @@
 function [power_MGT, heat_MGT, fuel_MGT] = extractPath(path, power_map, heat_map, fuel_map, SV_states)
 %extractPath: Get MGT commitment from solution of the shortestpath
 % algorithm
+nStates = size(SV_states,1);
 path_aux = path - 1; %Shift - move source node to index 0.;
-
-path_states = mod(path_aux(2:end-1)-1, numel(SV_states));
-path_times = floor((path_aux(2:end-1) - 0.5)/(numel(SV_states))) + 1;
+path_states = mod(path_aux(2:end-1)-1, nStates);
+path_times = floor((path_aux(2:end-1) - 0.5)/nStates) + 1;
 
 path_states(path_states == 0) = size(SV_states, 1);
 

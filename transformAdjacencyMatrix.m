@@ -17,6 +17,7 @@
 function [SV_states, time_from, n_tsteps, from_state_map, to_state_map] = ...
           transformAdjacencyMatrix(state_from, state_to, svToStateNumber)
 % Move the s=0,v=0 to the end of the state list.
+nStates = size(svToStateNumber,1);
 SV_states = [svToStateNumber(2:end, :); svToStateNumber(1, :)];
 %node = 1, node = last are special nodes - shift all others by 1 and use
 %svToStateNumber to find out the order of the others.
@@ -31,17 +32,17 @@ ToTerminalNodeIndices = (state_to == TerminalNode);
 FromRegularNodeIndices = ~FromSourceNodeIndices;
 ToRegularNodeIndices = ~ToTerminalNodeIndices;
 
-from_state_map(FromSourceNodeIndices) = numel(SV_states); %(0,0)
-to_state_map(ToTerminalNodeIndices) = numel(SV_states); %(0,0)
+from_state_map(FromSourceNodeIndices) = nStates; %(0,0)
+to_state_map(ToTerminalNodeIndices) = nStates; %(0,0)
 
 %Shift state_from and state_to:
 state_from(FromRegularNodeIndices) = state_from(FromRegularNodeIndices) - 1;
 state_to(ToRegularNodeIndices) = state_to(ToRegularNodeIndices) - 1;
 
-from_state_map(FromRegularNodeIndices) = mod(state_from(FromRegularNodeIndices)-1, numel(SV_states));
-to_state_map(ToRegularNodeIndices) = mod(state_to(ToRegularNodeIndices)-1, numel(SV_states));
-from_state_map(from_state_map == 0) = numel(SV_states);
-to_state_map(to_state_map == 0) = numel(SV_states);
+from_state_map(FromRegularNodeIndices) = mod(state_from(FromRegularNodeIndices)-1, nStates);
+to_state_map(ToRegularNodeIndices) = mod(state_to(ToRegularNodeIndices)-1, nStates);
+from_state_map(from_state_map == 0) = nStates;
+to_state_map(to_state_map == 0) = nStates;
 
 % Determine the starting and ending times of a transition.
 time_from = zeros(size(state_from));
@@ -50,8 +51,8 @@ time_to = zeros(size(state_to));
 time_from(FromSourceNodeIndices) = 0;
 time_to(ToTerminalNodeIndices) = intmax('uint16');
 
-time_from(FromRegularNodeIndices) = floor((state_from(FromRegularNodeIndices) - 0.5)/(numel(SV_states))) + 1;
-time_to(ToRegularNodeIndices) = floor((state_to(ToRegularNodeIndices) - 0.5)/(numel(SV_states))) + 1;
+time_from(FromRegularNodeIndices) = floor((state_from(FromRegularNodeIndices) - 0.5)/nStates) + 1;
+time_to(ToRegularNodeIndices) = floor((state_to(ToRegularNodeIndices) - 0.5)/nStates) + 1;
 
 n_tsteps = time_to - time_from; %dT
 end
