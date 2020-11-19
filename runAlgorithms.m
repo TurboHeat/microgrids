@@ -35,6 +35,10 @@ nBuildTypes = numel(BUILDINGS_TO_TEST);
 nFuelPrices = numel(NATURAL_GAS_PARAMS());
 [buildingTypes, priceIndices] = getCaseIndices(nBuildTypes, nFuelPrices);
 
+%% Reporting on the current run:
+ws = warning();
+warning('off','MATLAB:mir_warning_maybe_uninitialized_temporary');
+
 if nargin > 0 && ~isempty(fuelIdx)
   tsdisp("Only fuelIdx = " + mat2str(fuelIdx) + " will be considered!")
   keepIdx = priceIndices == fuelIdx;
@@ -162,11 +166,12 @@ else
     outputData(iter).BuildingType = building;  
     outputData(iter).PriceIndex = priceInd;
     disp("Iteration #" + iter + " took " + toc(tv));
-    ppm.increment();
+    ppm.increment(); %#ok<PFBNS>
   end
   delete(ppm);  
 end
-
+% Restore previous warning state:
+warning(ws);
 %% Parse to a new form, which is easier to analyze
 % Initialize Structure - the values have no meaning, only the data
 % structure.
