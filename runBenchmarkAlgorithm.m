@@ -65,8 +65,6 @@ for iW = 1:NUM_WINDOWS
     % and generations, with a new edge-based method that linearly
     % interpolates the demand and generation.
     
-    d = demands_true(iW, iB);
-    
     %We run this again to avoid transition penalty.
     true_cost = sum(assignCostsInternal(...
         sol_select(path_edge), stateFromMap(path_edge), stateToMap(path_edge), NODES_CONNECTED_TO_ARTIFICIAL_START, ...
@@ -83,7 +81,6 @@ for iW = 1:NUM_WINDOWS
     Output.EstimatedCost(iW) = path_cost;
     Output.TrueCost(iW) = true_cost;
 end
-
 
 end
 

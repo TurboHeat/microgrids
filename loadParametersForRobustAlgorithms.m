@@ -14,9 +14,11 @@ NUM_BUILDINGS = numel(BUILDINGS);
 
 %% Initialization
 stepsPerHour = SECONDS_PER_HOUR / timeStepSize; % number of time steps in 1h
+
 %% Loading
 tmp = load(fullfile(kwargs.dataPath, 'graph_24h.mat'));
 g = tmp.g; SV2State = tmp.svToStateNumber; clear tmp;
+
 [elecTariffs, demands_estimate, demands_true, NUM_WINDOWS] = getTariffsAndDemands(BUILDINGS);
 nTotalNodes = size(SV2State, 1); %(smax-smin)*(vmax-vmin+1)+1
 % Engine maps:
@@ -148,17 +150,6 @@ powerMap = [reshape(powerMap.', [], 1); 0];
 heatMap = [reshape(heatMap.', [], 1); 0];
 fuelMap = [reshape(m_dot_f_map.', [], 1); 0];
 mdotFuelSU = sum(m_dot_f_map(:, 1:end-1)+m_dot_f_map(:, 2:end), 2); % Computes mdot of fuel consumed in startup for all the different max states
-end
-
-function [dailyTariffs,tariffQueryTimes] = getDailyTariffs(hourlyElecTariffs, dt)
-SECONDS_PER_MINUTE = 60;
-MINUTES_PER_HOUR = 60;
-SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
-HOURS_PER_DAY = 24;
-stepsPerHour = SECONDS_PER_HOUR / dt; %number of lines per hour
-tariffQueryTimes = linspace(0, HOURS_PER_DAY, stepsPerHour*HOURS_PER_DAY+1).'; tariffQueryTimes(end) = [];
-dailyTariffs = cell2mat(shiftdim(...
-  arrayfun( @(x)tariffAtTime(x, tariffQueryTimes), hourlyElecTariffs, 'UniformOutput', false), -2));
 end
 
 function T = getNumTimesteps(dt, endTime)
