@@ -1,4 +1,4 @@
-function [allScenariosData] = runAlgorithms(fuelIdx)
+function [] = runAlgorithms(fuelIdx)
 %% Constants
 OUTPUT_FOLDER = "../Data/Results";
 if ~isfolder(OUTPUT_FOLDER), mkdir(OUTPUT_FOLDER); end
@@ -82,6 +82,7 @@ algorithmParameterKey = [1:runBenchmark,1:runNominal,1:numRobustLinfty*runRobust
 algorithmParameters = algorithmParameterKey(algorithms);
 
 % Prepare structure for output data
+%{
 outputData(numPairs).Data.Power_Generation = [];
 outputData(numPairs).Data.Heat_Generation = [];
 outputData(numPairs).Data.Fuel_Consumption = [];
@@ -92,7 +93,7 @@ outputData(numPairs).Data.AlgorithmParameters{1} = [];
 
 outputData(numPairs).BuildingType = 0;
 outputData(numPairs).PriceIndex = 0;
-
+%}
 %% Run Algorithms on Scenarios
 % Initialize parallel pool:
 ts = datetime('now');
@@ -144,9 +145,11 @@ if batchStartupOptionUsed() || isempty(gcp('nocreate'))
     end
     
     parsave(fPath, out, iter, algType, algParam, building, priceInd);
+    %{
     outputData(iter).Data = out;
     outputData(iter).BuildingType = building;  
     outputData(iter).PriceIndex = priceInd;
+    %}
     tsdisp("Iteration #" + iter + " took " + toc(tv));
   end
 else  
@@ -192,9 +195,11 @@ else
     end
     fName = makeFilename(iter, algType, algParam, building, priceInd);
     parsave(fullfile(OUTPUT_FOLDER, fName), out, iter, algType, algParam, building, priceInd);
+    %{
     outputData(iter).Data = out;
     outputData(iter).BuildingType = building;  
     outputData(iter).PriceIndex = priceInd;
+    %}
     disp("Iteration #" + iter + " took " + toc(tv));
     ppm.increment(); %#ok<PFBNS>
   end
@@ -204,6 +209,7 @@ end
 warning(ws);
 %% Parse to a new form, which is easier to analyze
 %% TODO: Perform as part of a separate post-processing script
+%{
 % Initialize Structure - the values have no meaning, only the data
 % structure.
 currentScenarioData(numAlgorithms) = outputData(1).Data;
@@ -226,6 +232,7 @@ for jScenario = 1:numScenarios
   allScenariosData(jScenario).BuildingType = building;
   allScenariosData(jScenario).PriceIndex = priceInd;
 end
+%}
 end
 
 function parsave(fName, outputData, iter, algType, algParam, buildingId, fuelPriceId)  
