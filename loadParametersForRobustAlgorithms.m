@@ -57,6 +57,14 @@ mdot_MGT = zeros(T,1);
 
 
 function [elecTariffs, demands_averaged, demands_true, NUM_WINDOWS] = getTariffsAndDemands(buildings)
+% We save the results for the most common way to call this function
+EXISTING_DATA_PATH = "../Data/tarriffs_and_demands.mat";
+if isequal(buildings, 1:4) && isfile(EXISTING_DATA_PATH)
+  load(EXISTING_DATA_PATH, ...
+    'elecTariffs', 'demands_averaged', 'demands_true', 'NUM_WINDOWS');
+  return
+end
+%% 
 [CHP_averaged, CHP_nonAveraged, NUM_WINDOWS] = LOAD_DEMAND_DATASETS();
 
 %% Get all tariff & demand combinations
@@ -82,6 +90,9 @@ end
 demands_averaged = reshape([demands_averaged{:}], nBuildings, NUM_WINDOWS).';
 demands_true = reshape([demands_true{:}], nBuildings, NUM_WINDOWS).';
 elecTariffs = reshape([elecTariffs{:}], nBuildings, NUM_WINDOWS).';
+
+% Make sure we don't need to repeat this computation
+save(EXISTING_DATA_PATH, 'elecTariffs', 'demands_averaged', 'demands_true', 'NUM_WINDOWS');
 end
 
 function [chp_averaged,chp_notAveraged, nWindows] = LOAD_DEMAND_DATASETS()
