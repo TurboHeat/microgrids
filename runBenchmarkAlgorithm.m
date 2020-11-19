@@ -41,11 +41,16 @@ Output.AlgorithmParameters{1} = [];
 fuelPrice = PRICE_kg_f(iP);
 heatTariff = HEAT_TARIFF(iP);
 for iW = 1:NUM_WINDOWS
-    d = demands_true(iW, iB);
-    mElec = 1e3*d.valMean(:,1); %1e3* - conversion from kWh to W.
-    mHeat = 1e3*d.valMean(:,2);
-    sElec = 0*d.valStd(:,1); %should be zero anyhow.
-    sHeat = 0*d.valStd(:,2); %should be zero anyhow.
+    d = demands_true(iW, iB);  % _true == non-averaged 
+    % Since here we are using averaging windows that are 1 day long, either weekday or
+    % weekend data will be NaN depending on the day in question. Therefore, we must select
+    % the correct slice from the fields of d:
+    dataSlice = ~isnan(d.valMean(1,1,:));
+    
+    mElec = 1e3*d.valMean(:,1, dataSlice); %1e3* - conversion from kWh to W.
+    mHeat = 1e3*d.valMean(:,2, dataSlice);
+    sElec = 0*d.valStd(:,1, dataSlice); %should be zero anyhow.
+    sHeat = 0*d.valStd(:,2, dataSlice); %should be zero anyhow.
     
     decided_costs = assignCostsInternal(...
         sol_select, stateFromMap, stateToMap, nTotalNodes, ...
