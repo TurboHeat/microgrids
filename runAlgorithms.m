@@ -1,4 +1,9 @@
-function [] = runAlgorithms(fuelIdx)
+function [] = runAlgorithms(fuelIdx, minId, maxId)
+arguments
+  fuelIdx (1,:) double = []
+  minId (1,1) double = -Inf
+  maxId (1,1) double =  Inf
+end
 %% Constants
 OUTPUT_FOLDER = "../Data/Results";
 if ~isfolder(OUTPUT_FOLDER), mkdir(OUTPUT_FOLDER); end
@@ -36,9 +41,6 @@ nFuelPrices = numel(NATURAL_GAS_PARAMS());
 [buildingTypes, priceIndices] = getCaseIndices(nBuildTypes, nFuelPrices);
 
 %% Reporting on the current run:
-ws = warning();
-warning('off','MATLAB:mir_warning_maybe_uninitialized_temporary');
-
 if nargin > 0 && ~isempty(fuelIdx)
   tsdisp("Only fuelIdx = " + mat2str(fuelIdx) + " will be considered!")
   keepIdx = priceIndices == fuelIdx;
@@ -97,14 +99,20 @@ outputData(numPairs).PriceIndex = 0;
 %% Run Algorithms on Scenarios
 % Initialize parallel pool:
 ts = datetime('now');
-results = string(strsplit(evalc("parpool('local');"), '\n'));
-tsdisp(results(1), ts);
-tsdisp(results(2));
+if isempty(gcp('nocreate'))
+  results = string(strsplit(evalc("parpool('local');"), '\n'));
+  tsdisp(results(1), ts);
+  tsdisp(results(2));
+end
+% Suppress some warnings:
+spmd % Issue commands to all workers in pool (Single Program, Multiple Data)
+  warning('off', 'MATLAB:mir_warning_maybe_uninitialized_temporary');
+end
 
 nSc = numel(scenarios);
 if batchStartupOptionUsed() || isempty(gcp('nocreate'))
   % In case of batch execution (running on a cluster)
-  parfor iter = 1:nSc
+  parfor iter = max(1, minId):min(nSc, maxId)
     % Unpack scenario configurations:
     jScenario = scenarios(iter);
     iAlgorithm = algorithms(iter);
@@ -120,8 +128,10 @@ if batchStartupOptionUsed() || isempty(gcp('nocreate'))
     if isfile(fPath)
       tsdisp(fName + " already exists - skipping.");
       continue
-    else
+    else      
       tsdisp("Starting work on: " + fName);
+      % Create an empty file (so that other workers will skip it):
+      emptyFile(fPath); % In most cases, does nothing in parfor.
     end
     
     % Perform the computation
@@ -150,7 +160,7 @@ if batchStartupOptionUsed() || isempty(gcp('nocreate'))
     outputData(iter).BuildingType = building;  
     outputData(iter).PriceIndex = priceInd;
     %}
-    tsdisp("Iteration #" + iter + " took " + toc(tv));
+    tsdisp("Iteration #" + iter + " took " + round(toc(tv)) + "sec.");
   end
 else  
   ppm = ParforProgressbar(nSc);
@@ -205,8 +215,6 @@ else
   end
   delete(ppm);  
 end
-% Restore previous warning state:
-warning(ws);
 %% Parse to a new form, which is easier to analyze
 %% TODO: Perform as part of a separate post-processing script
 %{
@@ -233,6 +241,13 @@ for jScenario = 1:numScenarios
   allScenariosData(jScenario).PriceIndex = priceInd;
 end
 %}
+end
+
+function emptyFile(fPath)
+% Method 1:
+fclose(fopen(fPath, 'w'));
+% Method 2:
+% parsave(fPath, [], [], [], [], [], []);
 end
 
 function parsave(fName, outputData, iter, algType, algParam, buildingId, fuelPriceId)  
