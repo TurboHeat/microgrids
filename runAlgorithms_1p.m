@@ -114,6 +114,7 @@ if batchStartupOptionUsed()
   fPath = fullfile(OUTPUT_FOLDER, fName);
   if isfile(fPath)
     tsdisp(fName + " already exists - stopping.");
+    return
   else
     tsdisp("Starting work on: " + fName);
     % Create an empty file (so that other workers will skip it):
