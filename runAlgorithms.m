@@ -1,8 +1,9 @@
-function [] = runAlgorithms(fuelIdx, minId, maxId)
+function [] = runAlgorithms(fuelIdx, minId, maxId, W)
 arguments
   fuelIdx (1,:) double = []
   minId (1,1) double = -Inf
   maxId (1,1) double =  Inf
+  W (1,1) double = 10
 end
 %% Constants
 OUTPUT_FOLDER = "../Data/Results";
@@ -100,9 +101,16 @@ outputData(numPairs).PriceIndex = 0;
 % Initialize parallel pool:
 ts = datetime('now');
 if isempty(gcp('nocreate'))
-  results = string(strsplit(evalc("parpool('local');"), '\n'));
-  tsdisp(results(1), ts);
-  tsdisp(results(2));
+  try
+    results = string(strsplit(evalc("parpool(" + W + ");"), '\n'));
+    tsdisp(results(1), ts);
+    tsdisp(results(2));
+  catch ex
+    fwrite(2, "Unable to initialize computation for fuelIdx=" + fuelIdx + ...
+      ", id=[" + minId + ".." + maxId + "]. Additional information:" + string(char([13 10])));
+    fwrite(2, ex.getReport());
+    return
+  end
 end
 % Suppress some warnings:
 spmd % Issue commands to all workers in pool (Single Program, Multiple Data)
