@@ -1,6 +1,4 @@
-function [Statistics] = parseData(AllScenariosData)
-close all;
-
+function [Statistics] = analyzeResults(AllScenariosData)
 NumOfScenarios = length(AllScenariosData);
 NumOfAlgorithms = length(AllScenariosData(1).Data);
 WasBenchmarkRun = AllScenariosData(1).Data(1).AlgorithmType == -1;
