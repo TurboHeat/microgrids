@@ -1,5 +1,30 @@
 function [Statistics] = analyzeResults(AllScenariosData)
 NumOfScenarios = length(AllScenariosData);
+%% TODO: Integrate
+%{
+% Initialize Structure - the values have no meaning, only the data
+% structure.
+currentScenarioData(numAlgorithms) = outputData(1).Data;
+allScenariosData(numScenarios).Data = currentScenarioData;
+allScenariosData(numScenarios).BuildingType = 0;
+allScenariosData(numScenarios).PriceIndex = 0;
+
+for jScenario = 1:numScenarios
+  building = buildingTypes(jScenario);
+  priceInd = priceIndices(jScenario);
+  k = 1;
+  for iter = 1:numPairs
+    if (building == outputData(iter).BuildingType) && ...
+       (priceInd == outputData(iter).PriceIndex)
+      currentScenarioData(k) = outputData(iter).Data;
+      k = k+1;
+    end
+  end
+  allScenariosData(jScenario).Data = currentScenarioData;
+  allScenariosData(jScenario).BuildingType = building;
+  allScenariosData(jScenario).PriceIndex = priceInd;
+end
+%}
 NumOfAlgorithms = length(AllScenariosData(1).Data);
 WasBenchmarkRun = AllScenariosData(1).Data(1).AlgorithmType == -1;
 WasNominalRun = AllScenariosData(1).Data(2).AlgorithmType == 0;

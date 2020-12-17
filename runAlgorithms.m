@@ -223,32 +223,6 @@ else
   end
   delete(ppm);  
 end
-%% Parse to a new form, which is easier to analyze
-%% TODO: Perform as part of a separate post-processing script
-%{
-% Initialize Structure - the values have no meaning, only the data
-% structure.
-currentScenarioData(numAlgorithms) = outputData(1).Data;
-allScenariosData(numScenarios).Data = currentScenarioData;
-allScenariosData(numScenarios).BuildingType = 0;
-allScenariosData(numScenarios).PriceIndex = 0;
-
-for jScenario = 1:numScenarios
-  building = buildingTypes(jScenario);
-  priceInd = priceIndices(jScenario);
-  k = 1;
-  for iter = 1:numPairs
-    if (building == outputData(iter).BuildingType) && ...
-       (priceInd == outputData(iter).PriceIndex)
-      currentScenarioData(k) = outputData(iter).Data;
-      k = k+1;
-    end
-  end
-  allScenariosData(jScenario).Data = currentScenarioData;
-  allScenariosData(jScenario).BuildingType = building;
-  allScenariosData(jScenario).PriceIndex = priceInd;
-end
-%}
 end
 
 function emptyFile(fPath)
