@@ -1,4 +1,4 @@
-function [parsed, files] = parseResultFilenames(resPath, resFormatSpec)
+function [parsed] = parseResultFilenames(resPath, resFormatSpec)
 %{
 EXAMPLE:
 parsed = parseResultFolder();
@@ -33,9 +33,9 @@ files = dir(resPath);
 files = struct2table(files(~[files.isdir]));
 
 % Turn the list into a table
-parsed = array2table(cell2mat(...
+parsed = [files(:,1), array2table(cell2mat(...
   cellfun(@(x)sscanf(x, resFormatSpec), files.name, 'UniformOutput', false).')...
   .', 'VariableNames', ["Iteration", "Algorithm Type", "Algorithm Parameters",...
-  "Building Type", "Fuel Price ID"]);
+  "Building Type", "Fuel Price ID"])];
 
 end
