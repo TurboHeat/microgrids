@@ -1,5 +1,55 @@
-function [Statistics] = analyzeResults(AllScenariosData)
-NumOfScenarios = length(AllScenariosData);
+function [statistics] = analyzeResults(resultsFolder)
+arguments
+  resultsFolder (1,1) string = '../Data/Results/'
+end
+
+mergedFN = fullfile(resultsFolder, "all_results.mat");
+if isfile(mergedFN)
+  cases = struct2array( load(mergedFN) );
+else
+%% Build a metadata matrix:
+% First use the filenames
+[cases] = parseResultFilenames(resultsFolder);
+nCases = size(cases,1);
+% Reformat some fields:
+cases.("Building Type") = BuildingType(cases.("Building Type"));
+% Add some derived variables:
+cases.("Was Benchmark Run?") = cases.("Algorithm Type") == -1;
+cases.("Was Nominal Run?") = cases.("Algorithm Type") == 0;
+cases.("Was Robust Run?") = cases.("Algorithm Type") == 1;
+cases.("Was Mixed Run?") = cases.("Algorithm Type") == 2;
+cases.("Robust Index") = cumsum(cases.("Was Robust Run?")).*cases.("Was Robust Run?");
+cases.("Mixed Index") = cumsum(cases.("Was Mixed Run?")).*cases.("Was Mixed Run?");
+% Create legend entries:
+cases.Legend = strings(nCases,1);
+cases(cases.("Was Benchmark Run?"), "Legend") = table("Benchmark");
+cases(cases.("Was Nominal Run?"),   "Legend") = table("Nominal");
+id = cases.("Was Robust Run?");
+cases(id, "Legend") = table("Rob. L_\infty #" + cases{id, "Robust Index"});
+id = cases.("Was Mixed Run?");
+cases(id, "Legend") = table("Rob. Mixed #" + cases{id, "Mixed Index"});
+
+%% Load data files:
+for id = nCases:-1:1
+  od(id,:) = loadDataFile(fullfile(resultsFolder, cases{id, "name"}));
+end
+% Remove variables:
+od = removevars(od, 'AlgorithmType');
+% Rename variables:
+od.Properties.VariableNames = ["Power Generation", "Heat Generation", ...
+  "Fuel Consumption", "Estimated Cost", "True Cost", "Algorithm Parameters"];
+% Merge tables:
+cases = [cases, od];
+% Reorder variables:
+cases = movevars(cases, 'Algorithm Parameters', 'After', "Algorithm Parameters ID");
+
+%% Save
+save(mergedFN, 'cases');
+
+%% Cleanup:
+clearvars('-except', 'resultsFolder', 'cases') 
+end
+
 %% TODO: Integrate
 %{
 % Initialize Structure - the values have no meaning, only the data
@@ -25,56 +75,34 @@ for jScenario = 1:numScenarios
   allScenariosData(jScenario).PriceIndex = priceInd;
 end
 %}
-NumOfAlgorithms = length(AllScenariosData(1).Data);
-WasBenchmarkRun = AllScenariosData(1).Data(1).AlgorithmType == -1;
-WasNominalRun = AllScenariosData(1).Data(2).AlgorithmType == 0;
-
-% Build a legend for graphs appearing later.
-RobustIndex = 1;
-MixedIndex = 1;
-Legend = cell(NumOfAlgorithms, 1);
-for i = 1:length(Legend)
-  switch AllScenariosData(1).Data(i).AlgorithmType
-    case -1
-      Legend{i} = 'Benchmark';
-    case 0
-      Legend{i} = 'Nominal';
-    case 1
-      Legend{i} = ['Rob. L_\infty #', num2str(RobustIndex)];
-      RobustIndex = RobustIndex + 1;
-    case 2
-      Legend{i} = ['Rob. Mixed #', num2str(MixedIndex)];
-      MixedIndex = MixedIndex + 1;
-  end
-end
 
 % Build a structure to store statistics
-Statistics.PerDay(NumOfScenarios).TrueCost = [];
-Statistics.PerDay(NumOfScenarios).TrueOverEstimateCost = [];
+statistics.PerDay(nCases).TrueCost = [];
+statistics.PerDay(nCases).TrueOverEstimateCost = [];
 if (1 == WasBenchmarkRun)
-  Statistics.PerDay(NumOfScenarios).CostOverOptimal = [];
+  statistics.PerDay(nCases).CostOverOptimal = [];
 end
 if (1 == WasNominalRun)
-  Statistics.PerDay(NumOfScenarios).DifferenceFromNominal = [];
+  statistics.PerDay(nCases).DifferenceFromNominal = [];
 end
 
-Statistics.PerYear(NumOfScenarios).TrueCost = [];
-Statistics.PerYear(NumOfScenarios).TrueOverEstimateCost = [];
+statistics.PerYear(nCases).TrueCost = [];
+statistics.PerYear(nCases).TrueOverEstimateCost = [];
 if (1 == WasBenchmarkRun)
-  Statistics.PerYear(NumOfScenarios).CostOverOptimal = [];
+  statistics.PerYear(nCases).CostOverOptimal = [];
 end
 if (1 == WasNominalRun)
-  Statistics.PerYear(NumOfScenarios).DifferenceFromNominal = [];
+  statistics.PerYear(nCases).DifferenceFromNominal = [];
 end
 
-for i = 1:NumOfScenarios
-  CurrentScenarioData = AllScenariosData(i).Data;
-  TitleSuffix = [' - Scenario #', num2str(i)];
+for id = 1:nCases
+  CurrentScenarioData = AllScenariosData(id).Data;
+  TitleSuffix = [' - Scenario #', num2str(id)];
   
   
   %Plot "true" cost of schedule - cost of schedule for ground-truth
   %demand
-  figure(100*(i - 1)+1);
+  figure(100*(id - 1)+1);
   for j = 1:length(CurrentScenarioData)
     plot(CurrentScenarioData(j).TrueCost);
     hold all;
@@ -87,7 +115,7 @@ for i = 1:NumOfScenarios
   
   
   %Plot Ratio of Estimated cost over True Cost (Budget exceeding)
-  figure(100*(i - 1)+2);
+  figure(100*(id - 1)+2);
   for j = 2:length(CurrentScenarioData)
     plot((CurrentScenarioData(j).TrueCost ./ CurrentScenarioData(j).EstimatedCost - 1)*100);
     hold all;
@@ -101,26 +129,26 @@ for i = 1:NumOfScenarios
   for j = 1:length(CurrentScenarioData)
     TrueCost = CurrentScenarioData(j).TrueCost;
     
-    Statistics.PerDay(i).TrueCost = TrueCost;
-    Statistics.PerYear(i).TrueCost(j).Average = mean(TrueCost);
-    Statistics.PerYear(i).TrueCost(j).Std = std(TrueCost);
-    Statistics.PerYear(i).TrueCost(j).Max = max(TrueCost);
-    Statistics.PerYear(i).TrueCost(j).Min = min(TrueCost);
-    Statistics.PerYear(i).TrueCost(j).Median = median(TrueCost);
+    statistics.PerDay(id).TrueCost = TrueCost;
+    statistics.PerYear(id).TrueCost(j).Average = mean(TrueCost);
+    statistics.PerYear(id).TrueCost(j).Std = std(TrueCost);
+    statistics.PerYear(id).TrueCost(j).Max = max(TrueCost);
+    statistics.PerYear(id).TrueCost(j).Min = min(TrueCost);
+    statistics.PerYear(id).TrueCost(j).Median = median(TrueCost);
     
     Ratio = (CurrentScenarioData(j).TrueCost ./ CurrentScenarioData(j).EstimatedCost - 1) * 100;
-    Statistics.PerDay(i).TrueOverEstimateCost = Ratio;
-    Statistics.PerYear(i).TrueOverEstimateCost(j).TimePositive = sum(Ratio > 0) / length(Ratio) * 100;
-    Statistics.PerYear(i).TrueOverEstimateCost(j).Max = max(Ratio);
-    Statistics.PerYear(i).TrueOverEstimateCost(j).ConditionalValueAtRisk = mean(Ratio(Ratio > 0));
-    Statistics.PerYear(i).TrueOverEstimateCost(j).StdofValueAtRisk = std(Ratio(Ratio > 0));
+    statistics.PerDay(id).TrueOverEstimateCost = Ratio;
+    statistics.PerYear(id).TrueOverEstimateCost(j).TimePositive = sum(Ratio > 0) / length(Ratio) * 100;
+    statistics.PerYear(id).TrueOverEstimateCost(j).Max = max(Ratio);
+    statistics.PerYear(id).TrueOverEstimateCost(j).ConditionalValueAtRisk = mean(Ratio(Ratio > 0));
+    statistics.PerYear(id).TrueOverEstimateCost(j).StdofValueAtRisk = std(Ratio(Ratio > 0));
   end
   
   if (1 == WasBenchmarkRun)
     BenchmarkData = CurrentScenarioData(1);
     
     %Compute True cost over Nominal True Cost.
-    figure(100*(i - 1)+3);
+    figure(100*(id - 1)+3);
     for j = 2:length(CurrentScenarioData)
       plot((CurrentScenarioData(j).TrueCost ./ BenchmarkData.TrueCost - 1)*100);
       hold all;
@@ -133,17 +161,17 @@ for i = 1:NumOfScenarios
     
     for j = 1:length(CurrentScenarioData)
       Ratio = (CurrentScenarioData(j).TrueCost ./ BenchmarkData.TrueCost - 1) * 100;
-      Statistics.PerDay(i).CostOverOptimal = Ratio;
+      statistics.PerDay(id).CostOverOptimal = Ratio;
       if (j == 1) %Benchmark algorithm
-        Statistics.PerYear(i).CostOverOptimal(j).TimePositive = 0;
-        Statistics.PerYear(i).CostOverOptimal(j).Max = 0;
-        Statistics.PerYear(i).CostOverOptimal(j).ConditionalValueAtRisk = 0;
-        Statistics.PerYear(i).CostOverOptimal(j).StdofValueAtRisk = 0;
+        statistics.PerYear(id).CostOverOptimal(j).TimePositive = 0;
+        statistics.PerYear(id).CostOverOptimal(j).Max = 0;
+        statistics.PerYear(id).CostOverOptimal(j).ConditionalValueAtRisk = 0;
+        statistics.PerYear(id).CostOverOptimal(j).StdofValueAtRisk = 0;
       else %Other algorithms
-        Statistics.PerYear(i).CostOverOptimal(j).TimePositive = sum(Ratio > 0) / length(Ratio) * 100;
-        Statistics.PerYear(i).CostOverOptimal(j).Max = max(Ratio);
-        Statistics.PerYear(i).CostOverOptimal(j).ConditionalValueAtRisk = mean(Ratio(Ratio > 0));
-        Statistics.PerYear(i).CostOverOptimal(j).StdofValueAtRisk = std(Ratio(Ratio > 0));
+        statistics.PerYear(id).CostOverOptimal(j).TimePositive = sum(Ratio > 0) / length(Ratio) * 100;
+        statistics.PerYear(id).CostOverOptimal(j).Max = max(Ratio);
+        statistics.PerYear(id).CostOverOptimal(j).ConditionalValueAtRisk = mean(Ratio(Ratio > 0));
+        statistics.PerYear(id).CostOverOptimal(j).StdofValueAtRisk = std(Ratio(Ratio > 0));
       end
     end
   end
@@ -152,7 +180,7 @@ for i = 1:NumOfScenarios
     NominalData = CurrentScenarioData(2);
     
     %Compute how different the solution is different from the nominal solution.
-    figure(100*(i - 1)+4);
+    figure(100*(id - 1)+4);
     for j = 3:length(CurrentScenarioData)
       plot(sum((CurrentScenarioData(j).Power_Generation ~= NominalData.Power_Generation | ...
         CurrentScenarioData(j).Heat_Generation ~= NominalData.Heat_Generation | ...
@@ -171,13 +199,17 @@ for i = 1:NumOfScenarios
         CurrentScenarioData(j).Heat_Generation ~= NominalData.Heat_Generation | ...
         CurrentScenarioData(j).Fuel_Consumption ~= NominalData.Fuel_Consumption), 2);
       
-      Statistics.PerDay(i).DifferenceFromNominal = Diff;
-      Statistics.PerYear(i).DifferenceFromNominal(j).Max = max(Diff);
-      Statistics.PerYear(i).DifferenceFromNominal(j).Min = min(Diff);
-      Statistics.PerYear(i).DifferenceFromNominal(j).Average = mean(Diff);
-      Statistics.PerYear(i).DifferenceFromNominal(j).Median = median(Diff);
+      statistics.PerDay(id).DifferenceFromNominal = Diff;
+      statistics.PerYear(id).DifferenceFromNominal(j).Max = max(Diff);
+      statistics.PerYear(id).DifferenceFromNominal(j).Min = min(Diff);
+      statistics.PerYear(id).DifferenceFromNominal(j).Average = mean(Diff);
+      statistics.PerYear(id).DifferenceFromNominal(j).Median = median(Diff);
     end
   end
 end
 
+end
+
+function tab = loadDataFile(path)
+tab = struct2table(struct2array(load(path, 'outputData')), 'AsArray', true);
 end
