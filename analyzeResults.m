@@ -153,15 +153,17 @@ end
 function hF = visualizeScenario(scenario)
 NUM_FIGURES = 4;
 nRuns = size(scenario, 1);
-hF = gobjects(NUM_FIGURES,1); hAx = gobjects(NUM_FIGURES,1);
+hF = gobjects(NUM_FIGURES,1); hAx = gobjects(NUM_FIGURES,1); 
+hL = gobjects(NUM_FIGURES,1);
 bc = scenario( scenario.("Was Benchmark Run?"),:);
 nc = scenario( scenario.("Was Nominal Run?"),:);
 % Create figures:
 for k = 1:NUM_FIGURES
   hF(k) = figure('NumberTitle','off'); 
   hAx(k) = axes(hF(k));  %#ok<LAXES>
-  legend(hAx(k), 'Location', 'eastoutside', 'NumColumns', 3);
+  hL(k) = legend(hAx(k), 'Location', 'eastoutside', 'NumColumns', 3);  
 end
+set(hL, 'LimitMaxLegendEntries', false);
 hold(hAx, 'on');
 grid(hAx,'on');
 %% Figure 1: "true" cost of schedule (cost of schedule for ground-truth demand)
