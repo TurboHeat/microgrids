@@ -100,7 +100,7 @@ end
 
 function [chp_averaged,chp_notAveraged, nWindows] = LOAD_DEMAND_DATASETS()
 % The code below creates 2-week averaging windows for the 5 building types, where
-% the first window is [02-Jan-2004 00:00:00, 16-Jan-2004 00:00:00] (because we don't have
+% the first window is [01-Jan-2004 00:00:00, 15-Jan-2004 00:00:00] (because we don't have
 % data from the end of 2003 and we don't want to use the end of 2004 as a substitute).
 
 chp_averaged = [CHP2004Provider("../Data/RefBldgLargeHotelNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY),...
@@ -115,23 +115,17 @@ chp_notAveraged = [CHP2004Provider("../Data/RefBldgLargeHotelNew2004_v1.3_7.1_4A
        CHP2004Provider("../Data/USA_NY_New.York-Central.Park.725033_TMY3_HIGH.csv", 'windowSize', 1*CHP2004Provider.DATAPOINTS_PER_DAY),...
        CHP2004Provider("../Data/RefBldgHospitalNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', 1*CHP2004Provider.DATAPOINTS_PER_DAY)];   
    
-startDay = datetime(2004, 1, 16); % skip the first two weeks
+startDay = datetime(2004, 1, 15); % skip the first two weeks
 arrayfun(@(x)x.fastForward(startDay, 'last'), chp_averaged);
 arrayfun(@(x)x.fastForward(startDay, 'last'), chp_notAveraged);
 % Count how many times "next" can be called:
-nextCnt = 0; % Should be equal to: 365-14+1 = 352
+nextCnt = 0; % Should be equal to: 366-14+1 = 353
 while (chp_averaged(1).hasNext)
   nextCnt = nextCnt + 1;
   [~] = chp_averaged(1).next();
 end
-nextCnt = 0; % Should be equal to: 365-14+1 = 352
-while (chp_notAveraged(1).hasNext)
-  nextCnt = nextCnt + 1;
-  [~] = chp_notAveraged(1).next();
-end
 % Rewind again:
 arrayfun(@(x)x.fastForward(startDay, 'last'), chp_averaged);
-arrayfun(@(x)x.fastForward(startDay, 'last'), chp_notAveraged);
 nWindows = nextCnt;
 
 % chp = struct2array(load('../Data/CHP2004.mat', 'chp'));
