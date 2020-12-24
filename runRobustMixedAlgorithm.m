@@ -71,15 +71,17 @@ Output.AlgorithmParameters{1} = AlgorithmParameters;
 
 %% Run Algorithm
 % NUM_WINDOWS = 3; %Debug
+DATES_OF_DATA = (datetime(2004,1,15):datetime(2004,12,31)).'; 
+isWeekend = weekday(DATES_OF_DATA) == 7 | weekday(DATES_OF_DATA) == 1;
 
 fuelPrice = PRICE_kg_f(iP);
 heatTariff = HEAT_TARIFF(iP);
 for iW = 1:NUM_WINDOWS
-    d = demands_estimate(iW, iB);
-    mElec = 1e3*d.valMean(:,1); %1e3* - conversion from kWh to W.
-    mHeat = 1e3*d.valMean(:,2);
-    sElec = 1e3*d.valStd(:,1);
-    sHeat = 1e3*d.valStd(:,2);
+    d = demands_estimate(iW, iB);    
+    mElec = 1e3*d.valMean(:,1, 1+isWeekend(iW)); %1e3* - conversion from kWh to W.
+    mHeat = 1e3*d.valMean(:,2, 1+isWeekend(iW));
+    sElec = 1e3*d.valStd(:,1, 1+isWeekend(iW));
+    sHeat = 1e3*d.valStd(:,2, 1+isWeekend(iW));
     
     decided_costs_nospike = assignCostsInternal(...
         sol_select, stateFromMap, stateToMap, nTotalNodes, ...
