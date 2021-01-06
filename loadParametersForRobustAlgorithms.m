@@ -119,8 +119,8 @@ startDay = datetime(2004, 1, 15); % skip the first two weeks
 arrayfun(@(x)x.fastForward(startDay, 'last'), chp_averaged);
 arrayfun(@(x)x.fastForward(startDay, 'last'), chp_notAveraged);
 % Count how many times "next" can be called:
-nextCnt = 0; % Should be equal to: 366-14+1 = 353
-while (chp_averaged(1).hasNext)
+nextCnt = 0; % Should be equal to: 366-14+1 = 353 (1 day extra into the new year)
+while chp_averaged(1).hasNext()
   nextCnt = nextCnt + 1;
   [~] = chp_averaged(1).next();
 end

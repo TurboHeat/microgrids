@@ -35,14 +35,26 @@ iB = kwargs.BuildingType;
 loadParametersForRobustAlgorithms; % this is a script - VERY BAD PRACTICE!!!
 % Calling this in a loop is even worse, because many files are read from the hard-drive inside
 
+% NWI = 3; %Debug
+NWI = NUM_WINDOWS-1; % Number of Windows of Interest
+% Explanation of the "-1" above:
+%   The {averaging} windows are used to predict "the next day".
+%   The last "next day" happens to be in the next year (01/01/2005).
+%   We are not interested in predicting that day even though we have enough data for it, 
+%   because we have no ground-truth to compare it with later on.
+%=> As a result we use NUM_WINDOWS-1 to reflect this
+
 %% Initialize Variables
 % Output Data
-Output.Power_Generation = zeros(NUM_WINDOWS,endTime); %Does not save the power generation at all times, but just at ``XX:00" times.
-Output.Heat_Generation = zeros(NUM_WINDOWS,endTime);
-Output.Fuel_Consumption = zeros(NUM_WINDOWS,endTime);
-Output.EstimatedCost = zeros(NUM_WINDOWS,1);
-Output.TrueCost = zeros(NUM_WINDOWS,1);
-Output.AlgorithmType = 2;
+Output.Power_Generation = zeros(NWI,endTime); %Does not save the power generation at all times, but just at ``XX:00" times.
+Output.Heat_Generation = zeros(NWI,endTime);
+Output.Fuel_Consumption = zeros(NWI,endTime);
+Output.EstimatedCost = zeros(NWI,1);
+Output.TrueCost = zeros(NWI,1);
+Output.AlgorithmType = 2; % 0 - Nominal (not robust).
+                          % 1 - L_infty robust uncertainty set.
+                          % 2 - Mixed robust uncertainty set.
+                          
 switch Output.AlgorithmType
     case 0
         Output.AlgorithmParameters{1} = [];
@@ -70,13 +82,13 @@ end
 Output.AlgorithmParameters{1} = AlgorithmParameters;
 
 %% Run Algorithm
-% NUM_WINDOWS = 3; %Debug
 DATES_OF_DATA = (datetime(2004,1,15):datetime(2004,12,31)).'; 
 isWeekend = weekday(DATES_OF_DATA) == 7 | weekday(DATES_OF_DATA) == 1;
 
 fuelPrice = PRICE_kg_f(iP);
 heatTariff = HEAT_TARIFF(iP);
-for iW = 1:NUM_WINDOWS
+
+for iW = 1:NWI
     d = demands_estimate(iW, iB);    
     mElec = 1e3*d.valMean(:,1, 1+isWeekend(iW)); %1e3* - conversion from kWh to W.
     mHeat = 1e3*d.valMean(:,2, 1+isWeekend(iW));
