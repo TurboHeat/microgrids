@@ -22,25 +22,33 @@ iB = kwargs.BuildingType;
 %% Load Parameters 
 loadParametersForRobustAlgorithms();
 
+% NWI = 3; %Debug
+NWI = NUM_WINDOWS-1; % Number of Windows of Interest
+% Explanation of the "-1" above:
+%   The {averaging} windows are used to predict "the next day".
+%   The last "next day" happens to be in the next year (01/01/2005).
+%   We are not interested in predicting that day even though we have enough data for it, 
+%   because we have no ground-truth to compare it with later on.
+%=> As a result we use NUM_WINDOWS-1 to reflect this
+
 %% Initialize Variables
 % Output Data
-Output.Power_Generation = zeros(NUM_WINDOWS,endTime); %Does not save the power generation at all times, but just at ``XX:00" times.
-Output.Heat_Generation = zeros(NUM_WINDOWS,endTime);
-Output.Fuel_Consumption = zeros(NUM_WINDOWS,endTime);
-Output.EstimatedCost = zeros(NUM_WINDOWS,1);
-Output.TrueCost = zeros(NUM_WINDOWS,1);
-Output.AlgorithmType = -1;  % -1 - Benchmark (Predict future demand)
-                            % 0 - Nominal (not robust).
-                            % 1 - L_infty robust uncertainty set.
-                            % 2 - Mixed robust uncertainty set.
+Output.Power_Generation = zeros(NWI,endTime); %Does not save the power generation at all times, but just at ``XX:00" times.
+Output.Heat_Generation = zeros(NWI,endTime);
+Output.Fuel_Consumption = zeros(NWI,endTime);
+Output.EstimatedCost = zeros(NWI,1);
+Output.TrueCost = zeros(NWI,1);
+Output.AlgorithmType = -1;  % -1 - Benchmark (known future demand)
+                            %  0 - Nominal (not robust).
+                            %  1 - L_infty robust uncertainty set.
+                            %  2 - Mixed robust uncertainty set.
 Output.AlgorithmParameters{1} = [];
 
 %% Run Algorithm
-% NUM_WINDOWS = 3; %Debug
-
 fuelPrice = PRICE_kg_f(iP);
 heatTariff = HEAT_TARIFF(iP);
-for iW = 1:NUM_WINDOWS
+
+for iW = 1:NWI
     d = demands_true(iW, iB);  % _true == non-averaged 
     % Since here we are using averaging windows that are 1 day long, either weekday or
     % weekend data will be NaN depending on the day in question. Therefore, we must select
