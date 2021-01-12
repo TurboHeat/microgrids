@@ -33,7 +33,13 @@ classdef CHP2004Provider < ConsumptionDataProvider
   properties (GetAccess = public, SetAccess = immutable)
     observationWindow (1,1) double {mustBeInteger, mustBePositive} = CHP2004Provider.DEFAULT_WINDOW;
     nTimeSteps (1,1) double {mustBeInteger, mustBePositive} = realmax();
-    nQuantities (1,1) double {mustBeInteger, mustBePositive} = 1;
+    nQuantities (1,1) double {mustBeInteger, mustBePositive} = 1;    
+  end
+  
+  properties (GetAccess = public, SetAccess = private)
+    scaling (1,1) double = NaN + 1i; % New maximum value for re-scaling the data, [kW]
+    % The real part contains the new maximum value (NaN means default) and 
+    % the imag part contains the scaling factor (1 by default)
   end
   
   properties (Access = private)
@@ -48,6 +54,7 @@ classdef CHP2004Provider < ConsumptionDataProvider
         % Window size, in dataset-specific time units, for computation of statistics:
         kwargs.windowSize (1,1) double {mustBeInteger, mustBePositive} = CHP2004Provider.DEFAULT_WINDOW
         kwargs.isResidential (1,1) logical = ~contains(csvFullPath, "RefBldg");
+        kwargs.newMaxPowerDemand (1,1) double = NaN; % [kW]
       end
       cdp.observationWindow = kwargs.windowSize;
       isRes = kwargs.isResidential;
@@ -105,6 +112,9 @@ classdef CHP2004Provider < ConsumptionDataProvider
       % Store some information about the data
       cdp.nTimeSteps = numel(cdp.timestamps);
       cdp.nQuantities = size(cdp.data, 2);
+      
+      % Rescaling
+      cdp.rescalePower(kwargs.newMaxPowerDemand);
     end
 
     function tshObjNew = next(cdpObj)
@@ -167,6 +177,34 @@ classdef CHP2004Provider < ConsumptionDataProvider
         tshObj = cdpObj.next();
       end
     end
+    
+    function rescalePower(cdpObj, newMaxPowerDemand)
+      % A function for rescaling the demands. 
+      arguments
+        cdpObj (1,1) CHP2004Provider
+        newMaxPowerDemand (1,1) double {mustBeNonempty, mustBeReal} % new maximum value in [kW]
+      end
+      if cdpObj.currentWindowPosition ~= 1
+        % only allow if the object is rewinded
+        throw(MException('CHP2004Provider:rescaleUnrewindedObject',...
+          'Please rewind/fast-forward the object to the first time step before changing the scaling!'));
+      end
+      if ~isnan(newMaxPowerDemand)        
+        oldPowerScale = max(cdpObj.data(:,1));
+        scalingFactor = newMaxPowerDemand ./ oldPowerScale;
+        % Store the new maximum (real part) and the scaling factor (imag part) of the
+        %   scaling property.
+        cdpObj.scaling = newMaxPowerDemand + (scalingFactor*imag(cdpObj.scaling))*1i;
+        % Rescale both the heat and the power demand by the same factor:
+        cdpObj.data(:) = cdpObj.data .* scalingFactor;
+      else
+        if ~isnan(cdpObj.scaling)
+          unscalingFactor = imag(cdpObj.scaling);
+          cdpObj.data(:) = cdpObj.data ./ unscalingFactor;
+          cdpObj.scaling = NaN + 1i;
+        end
+      end
+    end
   end          
-  
+
 end % classdef
