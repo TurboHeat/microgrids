@@ -2,7 +2,7 @@ function [FUEL_MAP, HEAT_MAP, HEAT_TARIFF, MDOT_FUEL_SU, NODES_CONNECTED_TO_ARTI
  NUM_WINDOWS, POWER_MAP, PRICE_kg_f, RoundHourIndices, SV_states, demands_estimate, ...
  demands_true, elecTariffs, g, nTimesteps, nTotalNodes, sol_select, stateFromMap, ...
  stateToMap, stepsPerHour, timeFrom, transitionPenaltyFlag] = ...
- loadParametersForRobustAlgorithms(endTime, iB, kwargs, psf, timeStepSize)
+ loadParametersForRobustAlgorithms(endTime, iB, dataPath, psf, timeStepSize)
 %% Constants:
 % Fuel
 [PRICE_kg_f, HEAT_TARIFF] = NATURAL_GAS_PARAMS();
@@ -18,14 +18,14 @@ stepsPerHour = SECONDS_PER_HOUR / timeStepSize; % number of time steps in 1h
 
 %% Loading
 % Possible transitions:
-tmp = load(fullfile(kwargs.dataPath, 'graph_24h.mat'));
+tmp = load(fullfile(dataPath, 'graph_24h.mat'));
 g = tmp.g; SV2State = tmp.svToStateNumber; clear tmp;
 nTotalNodes = size(SV2State, 1); %(smax-smin)*(vmax-vmin+1)+1
 % Engine maps:
-[POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU] = loadEngineMaps(nTotalNodes, kwargs.dataPath);
+[POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU] = loadEngineMaps(nTotalNodes, dataPath);
 % Tariffs and demands
 maxPower = max(POWER_MAP)/1000; %[W] -> [kW]
-[elecTariffs, demands_estimate, demands_true, NUM_WINDOWS] = getTariffsAndScaledDemands(iB, maxPower.*psf);
+[elecTariffs, demands_estimate, demands_true, NUM_WINDOWS] = getTariffsAndScaledDemands(dataPath, iB, maxPower.*psf);
 
 
 %% Preliminary computations
@@ -50,20 +50,28 @@ transitionPenaltyFlag = [zeros(nTotalNodes, 1); ...
    zeros(nTotalNodes,1)]; % checks equality of V values
 end % function
 
-function [elecTariffs, demands_averaged, demands_true, NUM_WINDOWS] = getTariffsAndScaledDemands(buildings, scaling)
+function [elecTariffs, demands_averaged, demands_true, NUM_WINDOWS] = getTariffsAndScaledDemands(dataPath, buildings, scaling)
 arguments
+  dataPath (1,1) string
   buildings (1,:) BuildingType = BuildingType(1:4)
   scaling (1,:) double = NaN % technically, several are supported, but we're only using one at a time
 end
-% We save the results for the most common way to call this function
-EXISTING_DATA_PATH = "../Data/tarriffs_and_demands.mat";
-if isequal(buildings, 1:4) && isfile(EXISTING_DATA_PATH)
-  load(EXISTING_DATA_PATH, ...
+% Try to load precomputed results
+if isnan(scaling)
+  suffix = sprintf('B%1u', buildings);
+elseif isscalar(scaling)
+  suffix = sprintf('B%1u_x%4.2f', buildings, scaling);
+else
+  suffix = sprintf('B%1u_xM', buildings);
+end
+resultsFilename = fullfile(dataPath, sprintf('tarriffs_and_demands_%s.mat', suffix));
+if buildings == BuildingType.ResidentialHIGH && isfile(resultsFilename)
+  load(resultsFilename, ...
     'elecTariffs', 'demands_averaged', 'demands_true', 'NUM_WINDOWS');
   return
 end
 %% 
-[CHP_averaged, CHP_nonAveraged, NUM_WINDOWS] = LOAD_DEMAND_DATASETS();
+[CHP_averaged, CHP_nonAveraged, NUM_WINDOWS] = loadDemandDatasets(dataPath, buildings);
 
 %% Get all tariff & demand combinations
 nSc = numel(scaling);
@@ -111,11 +119,11 @@ demands_true = reshape([demands_true{:}], nBuildings, NUM_WINDOWS).';
 elecTariffs = reshape([elecTariffs{:}], nBuildings, NUM_WINDOWS).';
 
 % Make sure we don't need to repeat this computation
-save(EXISTING_DATA_PATH, 'buildings', 'elecTariffs', 'demands_averaged', 'demands_true', 'NUM_WINDOWS', 'scaling');
+save(resultsFilename, 'buildings', 'elecTariffs', 'demands_averaged', 'demands_true', 'NUM_WINDOWS', 'scaling');
 end
 
-function [chp_averaged,chp_notAveraged, nWindows] = LOAD_DEMAND_DATASETS()
-% The code below creates 2-week averaging windows for the 5 building types, where
+function [chp_averaged,chp_notAveraged, nWindows] = loadDemandDatasets(dataPath, buildings)
+% The code below creates 2-week averaging windows for the requested building types, where
 % the first window is [01-Jan-2004 00:00:00, 15-Jan-2004 00:00:00] (because we don't have
 % data from the end of 2003 and we don't want to use the end of 2004 as a substitute).
 % DO NOT REORDER THE CSV LOADING (this will require updating the BuildingType enumeration accordingly)
