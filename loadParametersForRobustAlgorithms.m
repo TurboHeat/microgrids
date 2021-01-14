@@ -1,38 +1,37 @@
+function [FUEL_MAP, HEAT_MAP, HEAT_TARIFF, MDOT_FUEL_SU, NODES_CONNECTED_TO_ARTIFICIAL_START, ...
+ NUM_WINDOWS, POWER_MAP, PRICE_kg_f, RoundHourIndices, SV_states, demands_estimate, ...
+ demands_true, elecTariffs, g, nTimesteps, nTotalNodes, sol_select, stateFromMap, ...
+ stateToMap, stepsPerHour, timeFrom, transitionPenaltyFlag] = ...
+ loadParametersForRobustAlgorithms(endTime, iB, kwargs, psf, timeStepSize)
 %% Constants:
 % Fuel
 [PRICE_kg_f, HEAT_TARIFF] = NATURAL_GAS_PARAMS();
-NUM_FUEL_PRICES = numel(PRICE_kg_f);
-% Buildings
-BUILDINGS = BuildingType(1:4);
-NUM_BUILDINGS = numel(BUILDINGS);
-FUEL_INDEX = repelem(1:NUM_FUEL_PRICES, 1, NUM_FUEL_PRICES*NUM_BUILDINGS).';
 
 SECONDS_PER_MINUTE = 60;
 MINUTES_PER_HOUR = 60;
 SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
-NO_ENVELOPE_ALPHA = 0;
 NODES_CONNECTED_TO_ARTIFICIAL_START = 1;
-NO_STATE_TRANSITION_PENALTY = 0;
 % NO_DEMAND = zeros(T,1); - defined later, as T is only defined later.
 
 %% Initialization
 stepsPerHour = SECONDS_PER_HOUR / timeStepSize; % number of time steps in 1h
 
 %% Loading
+% Possible transitions:
 tmp = load(fullfile(kwargs.dataPath, 'graph_24h.mat'));
 g = tmp.g; SV2State = tmp.svToStateNumber; clear tmp;
-
-[elecTariffs, demands_estimate, demands_true, NUM_WINDOWS] = getTariffsAndDemands(BUILDINGS);
 nTotalNodes = size(SV2State, 1); %(smax-smin)*(vmax-vmin+1)+1
 % Engine maps:
 [POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU] = loadEngineMaps(nTotalNodes, kwargs.dataPath);
+% Tariffs and demands
+maxPower = max(POWER_MAP)/1000; %[W] -> [kW]
+[elecTariffs, demands_estimate, demands_true, NUM_WINDOWS] = getTariffsAndScaledDemands(iB, maxPower.*psf);
+
 
 %% Preliminary computations
 T = getNumTimesteps(timeStepSize, endTime);
 IndicesInHour = T/endTime;
 RoundHourIndices = IndicesInHour*(1:endTime);
-nF = numel(FUEL_INDEX);
-NO_DEMAND = zeros(T,1);
 
 [SV_states, timeFrom, nTimesteps, stateFromMap, stateToMap] = ...
   transformAdjacencyMatrix(g.Edges.EndNodes(:,1), g.Edges.EndNodes(:,2), SV2State);
@@ -49,17 +48,13 @@ transitionPenaltyFlag = [zeros(nTotalNodes, 1); ...
   ~(SV_states(stateFromMap(nTotalNodes+1:end-nTotalNodes), 1) == SV_states(stateToMap(nTotalNodes+1:end-nTotalNodes), 1) & ... %checks equality of S values
     SV_states(stateFromMap(nTotalNodes+1:end-nTotalNodes), 2) == SV_states(stateToMap(nTotalNodes+1:end-nTotalNodes), 2));
    zeros(nTotalNodes,1)]; % checks equality of V values
+end % function
 
-%% Preallocation
-nPrices = numel(PRICE_kg_f);
-nScenarios = nPrices*NUM_BUILDINGS;
-
-power_MGT = zeros(T,1);
-heat_MGT = zeros(T,1);
-mdot_MGT = zeros(T,1);
-
-
-function [elecTariffs, demands_averaged, demands_true, NUM_WINDOWS] = getTariffsAndDemands(buildings)
+function [elecTariffs, demands_averaged, demands_true, NUM_WINDOWS] = getTariffsAndScaledDemands(buildings, scaling)
+arguments
+  buildings (1,:) BuildingType = BuildingType(1:4)
+  scaling (1,:) double = NaN % technically, several are supported, but we're only using one at a time
+end
 % We save the results for the most common way to call this function
 EXISTING_DATA_PATH = "../Data/tarriffs_and_demands.mat";
 if isequal(buildings, 1:4) && isfile(EXISTING_DATA_PATH)

@@ -22,7 +22,12 @@ iB = kwargs.BuildingType;
 psf = kwargs.powerScalingFactor;
 
 %% Load Parameters 
-loadParametersForRobustAlgorithms();
+[FUEL_MAP, HEAT_MAP, HEAT_TARIFF, MDOT_FUEL_SU, NODES_CONNECTED_TO_ARTIFICIAL_START, ...
+ NUM_WINDOWS, POWER_MAP, PRICE_kg_f, RoundHourIndices, SV_states, ~, ...
+ demands_true, elecTariffs, g, nTimesteps, nTotalNodes, sol_select, stateFromMap, ...
+ stateToMap, stepsPerHour, timeFrom, transitionPenaltyFlag] = ...
+ loadParametersForRobustAlgorithms(endTime, iB, kwargs, psf, timeStepSize);
+% Calling this in a loop is bad, because many files are read from the hard-drive inside
 
 % NWI = 3; %Debug
 NWI = NUM_WINDOWS-1; % Number of Windows of Interest
