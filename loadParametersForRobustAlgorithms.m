@@ -27,7 +27,6 @@ nTotalNodes = size(SV2State, 1); %(smax-smin)*(vmax-vmin+1)+1
 maxPower = max(POWER_MAP)/1000; %[W] -> [kW]
 [elecTariffs, demands_estimate, demands_true, NUM_WINDOWS] = getTariffsAndScaledDemands(dataPath, iB, maxPower.*psf);
 
-
 %% Preliminary computations
 T = getNumTimesteps(timeStepSize, endTime);
 IndicesInHour = T/endTime;
@@ -50,22 +49,22 @@ transitionPenaltyFlag = [zeros(nTotalNodes, 1); ...
    zeros(nTotalNodes,1)]; % checks equality of V values
 end % function
 
-function [elecTariffs, demands_averaged, demands_true, NUM_WINDOWS] = getTariffsAndScaledDemands(dataPath, buildings, scaling)
+function [elecTariffs, demands_averaged, demands_true, NUM_WINDOWS] = getTariffsAndScaledDemands(dataPath, buildings, newMaxPower)
 arguments
   dataPath (1,1) string
   buildings (1,:) BuildingType = BuildingType(1:4)
-  scaling (1,:) double = NaN % technically, several are supported, but we're only using one at a time
+  newMaxPower (1,:) double = NaN % technically, several are supported, but we're only using one at a time
 end
 % Try to load precomputed results
-if isnan(scaling)
+if isnan(newMaxPower)
   suffix = sprintf('B%1u', buildings);
-elseif isscalar(scaling)
-  suffix = sprintf('B%1u_x%4.2f', buildings, scaling);
+elseif isscalar(newMaxPower)
+  suffix = sprintf('B%1u_x%4.2f', buildings, newMaxPower);
 else
   suffix = sprintf('B%1u_xM', buildings);
 end
 resultsFilename = fullfile(dataPath, sprintf('tarriffs_and_demands_%s.mat', suffix));
-if buildings == BuildingType.ResidentialHIGH && isfile(resultsFilename)
+if isfile(resultsFilename)
   load(resultsFilename, ...
     'elecTariffs', 'demands_averaged', 'demands_true', 'NUM_WINDOWS');
   return
@@ -74,14 +73,14 @@ end
 [CHP_averaged, CHP_nonAveraged, NUM_WINDOWS] = loadDemandDatasets(dataPath, buildings);
 
 %% Get all tariff & demand combinations
-nSc = numel(scaling);
+nSc = numel(newMaxPower);
 nBuildings = numel(buildings);
 elecTariffs = cell(nBuildings, NUM_WINDOWS);
 demands_averaged = cell(nBuildings, NUM_WINDOWS, nSc);
 demands_true = cell(nBuildings, NUM_WINDOWS, nSc);
 % Get tariffs ONLY:
 for b = 1:nBuildings
-  chp = CHP_averaged(buildings(b));
+  chp = CHP_averaged(b);
   for d = 1:NUM_WINDOWS
     do = chp.next();
     elecTariffs{b,d} = getSeasonalElectricityTariff(b, do.timeEnd);
@@ -92,13 +91,13 @@ end
 
 for s = 1:nSc
   % Perform scaling:
-  arrayfun(@(x)x.rescalePower(scaling(s)), CHP_averaged(buildings));
+  arrayfun(@(x)x.rescalePower(newMaxPower(s)), CHP_averaged);
   arrayfun(@(x)x.fastForward(chp.timestamps(1), 'first'), CHP_nonAveraged);
-  arrayfun(@(x)x.rescalePower(scaling(s)), CHP_nonAveraged(buildings));
+  arrayfun(@(x)x.rescalePower(newMaxPower(s)), CHP_nonAveraged);
   arrayfun(@(x)x.fastForward(datetime(2004, 1, 15), 'last'), CHP_nonAveraged);
   % Get moving-averaged demands:
   for b = 1:nBuildings
-    chp = CHP_averaged(buildings(b));
+    chp = CHP_averaged(b);
     for d = 1:NUM_WINDOWS
       do = chp.next(); 
       demands_averaged{b,d,s} = do; % demand object
@@ -106,7 +105,7 @@ for s = 1:nSc
   end
   % Get true demands:
   for b = 1:nBuildings
-    chp = CHP_nonAveraged(buildings(b));
+    chp = CHP_nonAveraged(b);
     for d = 1:NUM_WINDOWS
       do = chp.next(); 
       demands_true{b,d,s} = do; % demand object
@@ -119,7 +118,8 @@ demands_true = reshape([demands_true{:}], nBuildings, NUM_WINDOWS).';
 elecTariffs = reshape([elecTariffs{:}], nBuildings, NUM_WINDOWS).';
 
 % Make sure we don't need to repeat this computation
-save(resultsFilename, 'buildings', 'elecTariffs', 'demands_averaged', 'demands_true', 'NUM_WINDOWS', 'scaling');
+save(resultsFilename, 'buildings', 'elecTariffs', 'demands_averaged', 'demands_true', ...
+  'NUM_WINDOWS', 'newMaxPower');
 end
 
 function [chp_averaged,chp_notAveraged, nWindows] = loadDemandDatasets(dataPath, buildings)

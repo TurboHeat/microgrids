@@ -33,15 +33,17 @@ end
 % Unpack kwargs:
 transitionPenalty = kwargs.transitionPenalty;
 iP = kwargs.PriceIndex;
-iB = kwargs.BuildingType;
+tB = kwargs.BuildingType;
+pD = kwargs.dataPath;
 psf = kwargs.powerScalingFactor;
+a = kwargs.alpha;
 
 %% Load Parameters
 [FUEL_MAP, HEAT_MAP, HEAT_TARIFF, MDOT_FUEL_SU, NODES_CONNECTED_TO_ARTIFICIAL_START, ...
  NUM_WINDOWS, POWER_MAP, PRICE_kg_f, RoundHourIndices, SV_states, demands_estimate, ...
  demands_true, elecTariffs, g, nTimesteps, nTotalNodes, sol_select, stateFromMap, ...
  stateToMap, stepsPerHour, timeFrom, transitionPenaltyFlag] = ...
- loadParametersForRobustAlgorithms(endTime, iB, kwargs.dataPath, psf, timeStepSize);
+ loadParametersForRobustAlgorithms(endTime, tB, pD, psf, timeStepSize);
 % Calling this in a loop is bad, because many files are read from the hard-drive inside
 
 % NWI = 3; %Debug
@@ -62,7 +64,7 @@ Output.EstimatedCost = zeros(NWI,1);
 Output.TrueCost = zeros(NWI,1);
 Output.AlgorithmType = AlgorithmType.L_inf;
 
-AlgorithmParameters.alpha = kwargs.alpha;
+AlgorithmParameters.alpha = a;
 Output.AlgorithmParameters{1} = AlgorithmParameters;
 
 %% Run Algorithm
@@ -73,7 +75,7 @@ fuelPrice = PRICE_kg_f(iP);
 heatTariff = HEAT_TARIFF(iP);
 
 for iW = 1:NWI
-    d = demands_estimate(iW, iB);
+    d = demands_estimate(iW);
     mElec = 1e3*d.valMean(:,1, 1+isWeekend(iW)); %1e3* - conversion from kWh to W.
     mHeat = 1e3*d.valMean(:,2, 1+isWeekend(iW));
     sElec = 1e3*d.valStd(:,1, 1+isWeekend(iW));
@@ -81,8 +83,8 @@ for iW = 1:NWI
     
     decided_costs = assignCostsInternal(...
         sol_select, stateFromMap, stateToMap, nTotalNodes, ...
-        mElec, sElec, mHeat, sHeat, kwargs.alpha, ...
-        elecTariffs(iW, iB), heatTariff, fuelPrice,...
+        mElec, sElec, mHeat, sHeat, a, ...
+        elecTariffs(iW), heatTariff, fuelPrice,...
         POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
         transitionPenaltyFlag, transitionPenalty, ...
         timeFrom, nTimesteps, stepsPerHour, timeStepSize);
@@ -97,12 +99,12 @@ for iW = 1:NWI
     % and generations, with a new edge-based method that linearly
     % interpolates the demand and generation.
     
-    d = demands_true(iW, iB);
+    d = demands_true(iW);
     
     true_cost = sum(assignCostsInternal(...
         sol_select(path_edge), stateFromMap(path_edge), stateToMap(path_edge), NODES_CONNECTED_TO_ARTIFICIAL_START, ...
         1e3*d.valMean(:,1), 0*d.valMean(:,1), 1e3*d.valMean(:,2), 0*d.valMean(:,2), 0, ...
-        elecTariffs(iW, iB), heatTariff, fuelPrice,...
+        elecTariffs(iW), heatTariff, fuelPrice,...
         POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
         transitionPenaltyFlag(path_edge), transitionPenalty, ...
         timeFrom(path_edge), nTimesteps(path_edge), stepsPerHour, timeStepSize));
