@@ -9,7 +9,7 @@ arguments
   endTime (1,1) double {mustBePositive} = 24; % final time in [h]
   
   kwargs.PriceIndex (1,1) double {mustBePositive} = 1;
-  kwargs.BuildingType (1,1) double {mustBePositive} = 1;
+  kwargs.BuildingType (1,1) BuildingType {mustBePositive} = BuildingType.ResidentialHIGH;
     
   kwargs.dataPath (1,1) string = "../Data"
   kwargs.transitionPenalty (1,1) double = 0.01;
@@ -45,10 +45,7 @@ Output.Heat_Generation = zeros(NWI,endTime);
 Output.Fuel_Consumption = zeros(NWI,endTime);
 Output.EstimatedCost = zeros(NWI,1);
 Output.TrueCost = zeros(NWI,1);
-Output.AlgorithmType = -1;  % -1 - Benchmark (known future demand)
-                            %  0 - Nominal (not robust).
-                            %  1 - L_infty robust uncertainty set.
-                            %  2 - Mixed robust uncertainty set.
+Output.AlgorithmType = AlgorithmType.Benchmark;
 Output.AlgorithmParameters{1} = [];
 
 %% Run Algorithm

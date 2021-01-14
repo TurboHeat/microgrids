@@ -12,7 +12,7 @@ arguments
   %   Delta_H(t) = alpha_Linfty*std_H(t).
   
   kwargs.PriceIndex (1,1) double {mustBePositive} = 2;
-  kwargs.BuildingType (1,1) double {mustBePositive} = 2;
+  kwargs.BuildingType (1,1) BuildingType {mustBePositive} = BuildingType.ResidentialHIGH;
       
   kwargs.dataPath (1,1) string = "../Data"
   kwargs.transitionPenalty (1,1) double = 0.01;
@@ -27,6 +27,6 @@ output = runRobustLinftyAlgorithm( timeStepSize, endTime, ...
   'BuildingType', kwargs.BuildingType,...
   'powerScalingFactor', kwargs.powerScalingFactor);
 
-output.AlgorithmType = 0; 
+output.AlgorithmType = AlgorithmType.Nominal; 
 output.AlgorithmParameters{1} = [];
 end

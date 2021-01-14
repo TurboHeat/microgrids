@@ -17,7 +17,7 @@ arguments
   % delta_{H,t} = std_H(t) and mu_1 = alpha_spikes.
   
   kwargs.PriceIndex (1,1) double {mustBePositive} = 1;
-  kwargs.BuildingType (1,1) double {mustBePositive} = 1;
+  kwargs.BuildingType (1,1) BuildingType {mustBePositive} = BuildingType.ResidentialHIGH;
 
   kwargs.approx (1,1) ApproximationType = ApproximationType.MaxIter;
   kwargs.epsilon (1,1) double = 1E-1;
@@ -58,9 +58,7 @@ Output.Heat_Generation = zeros(NWI,endTime);
 Output.Fuel_Consumption = zeros(NWI,endTime);
 Output.EstimatedCost = zeros(NWI,1);
 Output.TrueCost = zeros(NWI,1);
-Output.AlgorithmType = 2; % 0 - Nominal (not robust).
-                          % 1 - L_infty robust uncertainty set.
-                          % 2 - Mixed robust uncertainty set.
+Output.AlgorithmType = AlgorithmType.Mixed;
                           
 switch Output.AlgorithmType
     case 0

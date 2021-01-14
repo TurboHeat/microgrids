@@ -60,9 +60,7 @@ Output.Heat_Generation = zeros(NWI,endTime);
 Output.Fuel_Consumption = zeros(NWI,endTime);
 Output.EstimatedCost = zeros(NWI,1);
 Output.TrueCost = zeros(NWI,1);
-Output.AlgorithmType = 1; % 0 - Nominal (not robust).
-                          % 1 - L_infty robust uncertainty set.
-                          % 2 - Mixed robust uncertainty set.
+Output.AlgorithmType = AlgorithmType.L_inf;
 
 AlgorithmParameters.alpha = kwargs.alpha;
 Output.AlgorithmParameters{1} = AlgorithmParameters;
