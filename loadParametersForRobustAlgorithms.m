@@ -66,22 +66,43 @@ end
 [CHP_averaged, CHP_nonAveraged, NUM_WINDOWS] = LOAD_DEMAND_DATASETS();
 
 %% Get all tariff & demand combinations
+nSc = numel(scaling);
 nBuildings = numel(buildings);
 elecTariffs = cell(nBuildings, NUM_WINDOWS);
-demands_averaged = cell(nBuildings, NUM_WINDOWS);
-demands_true = cell(nBuildings, NUM_WINDOWS);
-
+demands_averaged = cell(nBuildings, NUM_WINDOWS, nSc);
+demands_true = cell(nBuildings, NUM_WINDOWS, nSc);
+% Get tariffs ONLY:
 for b = 1:nBuildings
-  chp = CHP_averaged(b);
+  chp = CHP_averaged(buildings(b));
   for d = 1:NUM_WINDOWS
-    do = chp.next(); demands_averaged{b,d} = do; % demand object
+    do = chp.next();
     elecTariffs{b,d} = getSeasonalElectricityTariff(b, do.timeEnd);
   end
+  % Rewind the object
+  chp.fastForward(chp.timestamps(1), 'first');  
 end
-for b = 1:nBuildings
-  chp = CHP_nonAveraged(b);
-  for d = 1:NUM_WINDOWS
-    do = chp.next(); demands_true{b,d} = do; % demand object
+
+for s = 1:nSc
+  % Perform scaling:
+  arrayfun(@(x)x.rescalePower(scaling(s)), CHP_averaged(buildings));
+  arrayfun(@(x)x.fastForward(chp.timestamps(1), 'first'), CHP_nonAveraged);
+  arrayfun(@(x)x.rescalePower(scaling(s)), CHP_nonAveraged(buildings));
+  arrayfun(@(x)x.fastForward(datetime(2004, 1, 15), 'last'), CHP_nonAveraged);
+  % Get moving-averaged demands:
+  for b = 1:nBuildings
+    chp = CHP_averaged(buildings(b));
+    for d = 1:NUM_WINDOWS
+      do = chp.next(); 
+      demands_averaged{b,d,s} = do; % demand object
+    end
+  end
+  % Get true demands:
+  for b = 1:nBuildings
+    chp = CHP_nonAveraged(buildings(b));
+    for d = 1:NUM_WINDOWS
+      do = chp.next(); 
+      demands_true{b,d,s} = do; % demand object
+    end
   end
 end
 % Unbox:
@@ -90,7 +111,7 @@ demands_true = reshape([demands_true{:}], nBuildings, NUM_WINDOWS).';
 elecTariffs = reshape([elecTariffs{:}], nBuildings, NUM_WINDOWS).';
 
 % Make sure we don't need to repeat this computation
-save(EXISTING_DATA_PATH, 'elecTariffs', 'demands_averaged', 'demands_true', 'NUM_WINDOWS');
+save(EXISTING_DATA_PATH, 'buildings', 'elecTariffs', 'demands_averaged', 'demands_true', 'NUM_WINDOWS', 'scaling');
 end
 
 function [chp_averaged,chp_notAveraged, nWindows] = LOAD_DEMAND_DATASETS()
