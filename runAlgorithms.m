@@ -3,7 +3,7 @@ arguments
   fuelIdx (1,:) double = []
   minId (1,1) double = -Inf
   maxId (1,1) double =  Inf
-  W (1,1) double = 10
+  W (1,1) double = 10 % number of parpool workers to create
   psf (1,1) = NaN % power scaling factor (of the consumer's demand, relative to the turbine's capacity)
 end
 %% Constants

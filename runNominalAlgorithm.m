@@ -1,4 +1,4 @@
-function [Output] = runNominalAlgorithm(timeStepSize, endTime, kwargs)
+function [output] = runNominalAlgorithm(timeStepSize, endTime, kwargs)
 % Analysis of the solution found by the shortestpath solver for no
 % uncertainty, appearing on (Rist et al., 2017).
 %
@@ -13,21 +13,20 @@ arguments
   
   kwargs.PriceIndex (1,1) double {mustBePositive} = 2;
   kwargs.BuildingType (1,1) double {mustBePositive} = 2;
-  
+      
   kwargs.dataPath (1,1) string = "../Data"
   kwargs.transitionPenalty (1,1) double = 0.01;
   kwargs.powerScalingFactor (1,1) double = NaN;
 end
-PriceIndex = kwargs.PriceIndex;
-BuildingType = kwargs.BuildingType;
-dataPath = kwargs.dataPath;
-transitionPenalty = kwargs.transitionPenalty;
-Output = runRobustLinftyAlgorithm(timeStepSize,endTime,'alpha',0,...
-                                  'dataPath',dataPath,...
-                                  'transitionPenalty',transitionPenalty,...
-                                  'PriceIndex',PriceIndex,...
-                                  'BuildingType',BuildingType);
 
-Output.AlgorithmType = 0; 
-Output.AlgorithmParameters{1} = [];
+output = runRobustLinftyAlgorithm( timeStepSize, endTime, ...
+  'alpha', 0,...
+  'dataPath', kwargs.dataPath,...
+  'transitionPenalty', kwargs.transitionPenalty,...
+  'PriceIndex', kwargs.PriceIndex,...
+  'BuildingType', kwargs.BuildingType,...
+  'powerScalingFactor', kwargs.powerScalingFactor);
+
+output.AlgorithmType = 0; 
+output.AlgorithmParameters{1} = [];
 end
