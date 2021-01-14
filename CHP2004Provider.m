@@ -117,7 +117,9 @@ classdef CHP2004Provider < ConsumptionDataProvider
       cdp.rescalePower(kwargs.newMaxPowerDemand);
     end
 
-    function tshObjNew = next(cdpObj)
+    function tshObjNew = next(cdpObj) % throws OutOfDataException
+      % WARNING: the existence of a "next" window is not checked in advanced!
+      
       % Retrieve data:
       idx = cdpObj.currentWindowPosition : cdpObj.currentWindowPosition + cdpObj.observationWindow;
       tshObjNew = TimestampedStatHolder(cdpObj.timestamps(idx), cdpObj.data(idx,:),...

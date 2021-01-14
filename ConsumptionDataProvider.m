@@ -1,9 +1,9 @@
-classdef (Abstract) ConsumptionDataProvider < handle
+classdef (Abstract) ConsumptionDataProvider < handle & matlab.mixin.Heterogeneous
   % An interface for various loader classes.
   
   properties
-    data(:,:) double % the actual data being provided
-    timestamps (:,1) datetime % timestemps for the provided data    
+    data (:,:) double % the actual data being provided
+    timestamps (:,1) datetime % timestamps for the provided data
   end
   
   methods (Access = public, Abstract = true)
@@ -15,5 +15,11 @@ classdef (Abstract) ConsumptionDataProvider < handle
     % The HASNEXT method returns a logical indicating whether a "next" entry exists.
     tf = hasNext(cdpObj)
   end
-
+  
+  methods (Static, Sealed, Access = protected)
+    function do = getDefaultScalarElement
+      do = EmptyDataProvider();
+    end
+  end
+  
 end
