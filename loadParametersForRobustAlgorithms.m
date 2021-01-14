@@ -126,19 +126,23 @@ function [chp_averaged,chp_notAveraged, nWindows] = loadDemandDatasets(dataPath,
 % The code below creates 2-week averaging windows for the requested building types, where
 % the first window is [01-Jan-2004 00:00:00, 15-Jan-2004 00:00:00] (because we don't have
 % data from the end of 2003 and we don't want to use the end of 2004 as a substitute).
-% DO NOT REORDER THE CSV LOADING (this will require updating the BuildingType enumeration accordingly)
-chp_averaged = [CHP2004Provider("../Data/RefBldgLargeHotelNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY),...
-       CHP2004Provider("../Data/RefBldgFullServiceRestaurantNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY),...
-       CHP2004Provider("../Data/RefBldgSmallHotelNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY),...
-       CHP2004Provider("../Data/USA_NY_New.York-Central.Park.725033_TMY3_HIGH.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY),...
-       CHP2004Provider("../Data/RefBldgHospitalNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', CHP2004Provider.DEFAULT_WINDOW*CHP2004Provider.DATAPOINTS_PER_DAY)];     
+SINGLE_DAY_WINDOW = 1;
+PPD = CHP2004Provider.DATAPOINTS_PER_DAY;
 
-chp_notAveraged = [CHP2004Provider("../Data/RefBldgLargeHotelNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', 1*CHP2004Provider.DATAPOINTS_PER_DAY),...
-       CHP2004Provider("../Data/RefBldgFullServiceRestaurantNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', 1*CHP2004Provider.DATAPOINTS_PER_DAY),...
-       CHP2004Provider("../Data/RefBldgSmallHotelNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', 1*CHP2004Provider.DATAPOINTS_PER_DAY),...
-       CHP2004Provider("../Data/USA_NY_New.York-Central.Park.725033_TMY3_HIGH.csv", 'windowSize', 1*CHP2004Provider.DATAPOINTS_PER_DAY),...
-       CHP2004Provider("../Data/RefBldgHospitalNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv", 'windowSize', 1*CHP2004Provider.DATAPOINTS_PER_DAY)];   
-   
+% DO NOT REORDER THE CSV LOADING (this will require updating the BuildingType enumeration accordingly)
+CSV_NAMES = ["RefBldgLargeHotelNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv";
+             "RefBldgFullServiceRestaurantNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv";
+             "RefBldgSmallHotelNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv";
+             "USA_NY_New.York-Central.Park.725033_TMY3_HIGH.csv";
+             "RefBldgHospitalNew2004_v1.3_7.1_4A_USA_MD_BALTIMORE.csv"];
+csvPaths = fullfile(dataPath, CSV_NAMES);
+
+for iC = numel(buildings):-1:1
+  iB = buildings(iC);
+  chp_averaged(iC) = CHP2004Provider(csvPaths(iB), 'windowSize', CHP2004Provider.DEFAULT_WINDOW*PPD);
+  chp_notAveraged(iC) = CHP2004Provider(csvPaths(iB), 'windowSize', SINGLE_DAY_WINDOW*PPD);
+end
+
 startDay = datetime(2004, 1, 15); % skip the first two weeks
 arrayfun(@(x)x.fastForward(startDay, 'last'), chp_averaged);
 arrayfun(@(x)x.fastForward(startDay, 'last'), chp_notAveraged);
