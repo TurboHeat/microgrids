@@ -14,9 +14,9 @@ arguments
   kwargs.PriceIndex (1,1) double {mustBePositive} = 2;
   kwargs.BuildingType (1,1) double {mustBePositive} = 2;
   
-    
   kwargs.dataPath (1,1) string = "../Data"
   kwargs.transitionPenalty (1,1) double = 0.01;
+  kwargs.powerScalingFactor (1,1) double = NaN;
 end
 PriceIndex = kwargs.PriceIndex;
 BuildingType = kwargs.BuildingType;

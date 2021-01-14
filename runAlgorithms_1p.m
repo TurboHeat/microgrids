@@ -1,7 +1,8 @@
-function [] = runAlgorithms_1p(fuelIdx, iter)
+function [] = runAlgorithms_1p(fuelIdx, iter, psf)
 arguments
   fuelIdx (1,:) double = []
   iter (1,1) double {mustBePositive, mustBeInteger} = 1
+  psf (1,1) = NaN % power scaling factor (of the consumer's demand, relative to the turbine's capacity)
 end
 %% Constants
 OUTPUT_FOLDER = "../Data/Results";
@@ -110,7 +111,7 @@ if batchStartupOptionUsed()
   priceInd = priceIndices(jScenario);
   
   % Determine if we need to compute the current file:
-  fName = makeFilename(iter, algType, algParam, building, priceInd);
+  fName = makeFilename(iter, algType, algParam, building, priceInd, psf);
   fPath = fullfile(OUTPUT_FOLDER, fName);
   if isfile(fPath)
     tsdisp(fName + " already exists - stopping.");
@@ -126,22 +127,26 @@ if batchStartupOptionUsed()
   switch algType
     case -1
       out = runBenchmarkAlgorithm('PriceIndex',priceInd,...
-        'BuildingType', building);
+        'BuildingType', building,...
+        'powerScalingFactor', psf);
     case 0
       out = runNominalAlgorithm('PriceIndex',priceInd,...
-        'BuildingType', building);
+        'BuildingType', building,...
+        'powerScalingFactor', psf);
     case 1
       out = runRobustLinftyAlgorithm('PriceIndex',priceInd,...
         'BuildingType', building,...
-        'alpha', LinftyAlphas(algParam));
+        'alpha', LinftyAlphas(algParam),...
+        'powerScalingFactor', psf);
     case 2
       out = runRobustMixedAlgorithm('PriceIndex',priceInd,...
         'BuildingType',building,...
         'alphaMixed', mixedAlphas(algParam),...
-        'alphaSpikes', mixedSpikeAlphas(algParam));
+        'alphaSpikes', mixedSpikeAlphas(algParam),...
+        'powerScalingFactor', psf);
   end
   
-  parsave(fPath, out, iter, algType, algParam, building, priceInd);
+  parsave(fPath, out, iter, algType, algParam, building, priceInd, psf);
   %{
     outputData(iter).Data = out;
     outputData(iter).BuildingType = building;
@@ -158,8 +163,8 @@ fclose(fopen(fPath, 'w'));
 % parsave(fPath, [], [], [], [], [], []);
 end
 
-function parsave(fName, outputData, iter, algType, algParam, buildingId, fuelPriceId)
-save(fName, 'outputData', 'iter', 'algType', 'algParam', 'buildingId', 'fuelPriceId');
+function parsave(fName, outputData, iter, algType, algParam, buildingId, fuelPriceId, psf)  
+save(fName, 'outputData', 'iter', 'algType', 'algParam', 'buildingId', 'fuelPriceId', 'psf');
 end
 
 function [buildIdx, priceIdx] = getCaseIndices(nBuildings, nFuelPrices)
@@ -167,12 +172,12 @@ buildIdx = repmat(1:nBuildings, 1, nFuelPrices);
 priceIdx = repelem(1:nFuelPrices, 1, nBuildings);
 end
 
-function [nameStr] = makeFilename(iter, algType, algParams, bldgTypeId, fuelPriceId)
+function [nameStr] = makeFilename(iter, algType, algParams, bldgTypeId, fuelPriceId, powerScalingFactor)
 % Returns the name of the file into which to save intermediate results.
 % NOTE: The formatspec may need to be modified if the simulation grid is modified
 %       significantly (e.g., more than 1E4-1 iterations).
-nameStr = compose("I%04u_AT%02d_AP%03u_B%1u_F%1u.mat", ...
-  iter, algType, algParams, bldgTypeId, fuelPriceId);
+nameStr = compose("I%04u_AT%02d_AP%03u_B%1u_F%1u_PSF%4.2f.mat", ...
+  iter, algType, algParams, bldgTypeId, fuelPriceId, powerScalingFactor);
 end
 
 function [] = tsdisp(msg, ts)

@@ -28,11 +28,13 @@ arguments
     
   kwargs.dataPath (1,1) string = "../Data"
   kwargs.transitionPenalty (1,1) double = 0.01;
+  kwargs.powerScalingFactor (1,1) double = NaN;
 end
 % Unpack kwargs:
 transitionPenalty = kwargs.transitionPenalty;
 iP = kwargs.PriceIndex;
 iB = kwargs.BuildingType;
+psf = kwargs.powerScalingFactor;
 
 %% Load Parameters 
 loadParametersForRobustAlgorithms; % this is a script - VERY BAD PRACTICE!!!

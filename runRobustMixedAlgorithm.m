@@ -25,12 +25,15 @@ arguments
   
   kwargs.dataPath (1,1) string = "../Data"
   kwargs.transitionPenalty (1,1) double = 0.01;
+  kwargs.powerScalingFactor (1,1) double = NaN;
 end
 % Unpack kwargs:
 transitionPenalty = kwargs.transitionPenalty;
 epsilon = kwargs.epsilon;
 iP = kwargs.PriceIndex;
 iB = kwargs.BuildingType;
+psf = kwargs.powerScalingFactor;
+
 %% Load Parameters 
 loadParametersForRobustAlgorithms; % this is a script - VERY BAD PRACTICE!!!
 % Calling this in a loop is even worse, because many files are read from the hard-drive inside
