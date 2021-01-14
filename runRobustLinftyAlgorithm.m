@@ -24,7 +24,7 @@ arguments
   %   Delta_H(t) = alpha_Linfty*std_H(t).
   
   kwargs.PriceIndex (1,1) double {mustBePositive} = 1;
-  kwargs.BuildingType (1,1) double {mustBePositive} = 1;
+  kwargs.BuildingType (1,1) BuildingType {mustBePositive} = BuildingType.ResidentialHIGH;
     
   kwargs.dataPath (1,1) string = "../Data"
   kwargs.transitionPenalty (1,1) double = 0.01;
