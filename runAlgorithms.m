@@ -128,7 +128,7 @@ if batchStartupOptionUsed() || isempty(gcp('nocreate'))
     algType = algorithmType(iter);
     algParam = algorithmParameters(iter);
 
-    building = buildingTypes(jScenario);
+    building = BUILDINGS_TO_TEST(buildingTypes(jScenario));
     priceInd = priceIndices(jScenario);
     
     % Determine if we need to compute the current file:
