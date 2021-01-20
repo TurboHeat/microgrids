@@ -7,6 +7,7 @@ arguments
   psf (1,1) = NaN % power scaling factor (of the consumer's demand, relative to the turbine's capacity)
 end
 %% Preparations for running on a cluster
+patchJobStorageLocation(); % Fix for a race condition related to temporary files
 try PBSinfo(); catch, end % Record job info in the log file
 
 %% Constants
