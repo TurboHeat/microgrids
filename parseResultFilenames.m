@@ -26,7 +26,7 @@ grid(hAx, 'on');
 %}
 arguments
   resPath (1,1) string = "../Data/Results";
-  resFormatSpec (1,1) string = "I%04u_AT%02d_AP%03u_B%1u_F%1u.mat";
+  resFormatSpec (1,1) string = "I%04u_AT%02d_AP%03u_B%1u_F%1u_PSF%4f.mat";
 end
 % List files
 files = dir(resPath);
@@ -36,6 +36,6 @@ files = struct2table(files(~[files.isdir]));
 parsed = [files(:,1), array2table(cell2mat(...
   cellfun(@(x)sscanf(x, resFormatSpec), files.name, 'UniformOutput', false).')...
   .', 'VariableNames', ["Iteration", "Algorithm Type", "Algorithm Parameters ID",...
-  "Building Type", "Fuel Price ID"])];
+  "Building Type", "Fuel Price ID", "Power Scaling Factor"])];
 
 end

@@ -16,10 +16,10 @@ else
   cases.("Algorithm Type") = AlgorithmType(cases.("Algorithm Type"));
   cases.("Building Type") = BuildingType(cases.("Building Type"));
   % Add some derived variables:
-  cases.("Was Benchmark Run?") = cases.("Algorithm Type") == -1;
-  cases.("Was Nominal Run?") = cases.("Algorithm Type") == 0;
-  cases.("Was Robust Run?") = cases.("Algorithm Type") == 1;
-  cases.("Was Mixed Run?") = cases.("Algorithm Type") == 2;
+  cases.("Was Benchmark Run?") = cases.("Algorithm Type") == AlgorithmType.Benchmark;
+  cases.("Was Nominal Run?") = cases.("Algorithm Type") == AlgorithmType.Nominal;
+  cases.("Was Robust Run?") = cases.("Algorithm Type") == AlgorithmType.L_inf;
+  cases.("Was Mixed Run?") = cases.("Algorithm Type") == AlgorithmType.Mixed;
   cases.("Robust Index") = cumsum(cases.("Was Robust Run?")).*cases.("Was Robust Run?");
   cases.("Mixed Index") = cumsum(cases.("Was Mixed Run?")).*cases.("Was Mixed Run?");
   % Create legend entries:
@@ -64,7 +64,7 @@ if isfile(statsFn)
   clear tmp
 else
   %% Group runs into "scenarios" (unique combinations of building and fuel prices)
-  G = findgroups(cases.("Building Type"), cases.("Fuel Price ID"));
+  G = findgroups(cases.("Building Type"), cases.("Fuel Price ID"), cases.("Power Scaling Factor"));
   nG = max(G);
 
   %% Compute statistics:
