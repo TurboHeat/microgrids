@@ -6,6 +6,9 @@ arguments
   W (1,1) double = 10 % number of parpool workers to create
   psf (1,1) = NaN % power scaling factor (of the consumer's demand, relative to the turbine's capacity)
 end
+%% Preparations for running on a cluster
+try PBSinfo(); catch, end % Record job info in the log file
+
 %% Constants
 OUTPUT_FOLDER = "../Data/Results";
 if ~isfolder(OUTPUT_FOLDER), mkdir(OUTPUT_FOLDER); end
@@ -264,4 +267,11 @@ arguments
   ts (1,1) datetime = datetime('now')
 end
   disp(datestr(ts,"[dd-mm-yyyy HH:MM:SS.FFF] ") + msg);
+end
+
+function PBSinfo()
+id = getenv('PBS_JOBID');
+name = getenv('PBS_JOBNAME');
+ncpus = getenv('NCPUS');
+tsdisp("PBS job info: ID=" + id + ", Name=" + name + ", #CPUs=" + ncpus);
 end
