@@ -30,6 +30,9 @@ arguments
   kwargs.transitionPenalty (1,1) double = 0.01;
   kwargs.powerScalingFactor (1,1) double = NaN;
 end
+% Constants
+ABSOLUTE_CERTAINTY_ALPHA = 0;
+
 % Unpack kwargs:
 transitionPenalty = kwargs.transitionPenalty;
 iP = kwargs.PriceIndex;
@@ -92,18 +95,21 @@ for iW = 1:NWI
     g = digraph(g.Edges.EndNodes(:,1), g.Edges.EndNodes(:,2), decided_costs);
     [path_MGT, path_cost, path_edge] = shortestpath(g, 1, max(g.Edges.EndNodes(:,2)), 'Method', 'acyclic');
     [power_MGT, heat_MGT, mdot_MGT] = extractPath(path_MGT, POWER_MAP, HEAT_MAP, FUEL_MAP, SV_states);
-    
-    
+        
     %% Check Performance of the Schedule on True Demand
     % Replace old cost calculation method, which uses a ZOH for the demands
     % and generations, with a new edge-based method that linearly
     % interpolates the demand and generation.
     
     d = demands_true(iW);
+    mElec = 1e3*d.valMean(:,1, 1+isWeekend(iW)); %1e3* - conversion from kWh to W.
+    mHeat = 1e3*d.valMean(:,2, 1+isWeekend(iW));
+    sElec = 1e3*d.valStd(:,1, 1+isWeekend(iW)); % should be zero anyway
+    sHeat = 1e3*d.valStd(:,2, 1+isWeekend(iW)); % should be zero anyway
     
     true_cost = sum(assignCostsInternal(...
         sol_select(path_edge), stateFromMap(path_edge), stateToMap(path_edge), NODES_CONNECTED_TO_ARTIFICIAL_START, ...
-        1e3*d.valMean(:,1), 0*d.valMean(:,1), 1e3*d.valMean(:,2), 0*d.valMean(:,2), 0, ...
+        mElec, zeros(size(sElec)), mHeat, zeros(size(sHeat)), ABSOLUTE_CERTAINTY_ALPHA, ...
         elecTariffs(iW), heatTariff, fuelPrice,...
         POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
         transitionPenaltyFlag(path_edge), transitionPenalty, ...
@@ -141,4 +147,3 @@ decided_costs = assignCosts(...
   elecDemand, heatDemand, elecTariff, heatTariff, fuelPrice, ...
   transitionPenaltyFlag, transitionPenalty, stepsPerHour);
 end
-
