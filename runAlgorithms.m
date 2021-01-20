@@ -13,6 +13,13 @@ try PBSinfo(); catch, end % Record job info in the log file
 %% Constants
 OUTPUT_FOLDER = "../Data/Results";
 if ~isfolder(OUTPUT_FOLDER), mkdir(OUTPUT_FOLDER); end
+RUN_BANK = [391,... Benchmark 1:1 (1)
+            392,... Nominal   2:2 (1)
+            395,400,403,404,405,406,407,408,... L_inf 3:10 (8)
+            411,413,421,422,424,432,433,435,440,443,444,446,... Mixed1 11:22 (12)
+            454,455,457,458,461,462,463,464,465,466,467,468,... Mixed2 23:34 (12)
+            473,474,475,476,477,478,479,480,484,485,487,488,... Mixed3 35:46 (12)
+            490,498,499,501,509,510,512,519,520].';           % Mixed4 47:55 (9)
 
 %% Choose Running Algorithms
 runBenchmark = 1;
@@ -123,9 +130,11 @@ spmd % Issue commands to all workers in pool (Single Program, Multiple Data)
 end
 
 nSc = numel(scenarios);
-if batchStartupOptionUsed() || isempty(gcp('nocreate'))
+iter_ids = RUN_BANK(max(1, minId):min(nSc, maxId));
+if batchStartupOptionUsed()
   % In case of batch execution (running on a cluster)
-  parfor iter = max(1, minId):min(nSc, maxId)
+  parfor idx = 1:numel(iter_ids)
+    iter = iter_ids(idx);
     % Unpack scenario configurations:
     jScenario = scenarios(iter);
     iAlgorithm = algorithms(iter);
@@ -188,7 +197,7 @@ else
     algType = algorithmType(iter);
     algParam = algorithmParameters(iter);
 
-    building = buildingTypes(jScenario);
+    building = BUILDINGS_TO_TEST(buildingTypes(jScenario));
     priceInd = priceIndices(jScenario);
     
     % Determine if we need to compute the current file:
@@ -246,7 +255,7 @@ fclose(fopen(fPath, 'w'));
 end
 
 function parsave(fName, outputData, iter, algType, algParam, buildingId, fuelPriceId, psf)  
-  save(fName, 'outputData', 'iter', 'algType', 'algParam', 'buildingId', 'fuelPriceId', 'psf');
+save(fName, 'outputData', 'iter', 'algType', 'algParam', 'buildingId', 'fuelPriceId', 'psf');
 end
 
 function [buildIdx, priceIdx] = getCaseIndices(nBuildings, nFuelPrices)
