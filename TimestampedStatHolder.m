@@ -70,9 +70,12 @@ classdef TimestampedStatHolder < handle
         wd = ~we; % weekday
         areWeekdaysInData = any(wd);
         areWeekendsInData = any(we);
+        % Note that when working with hourly data of full days, the last timestamp, 
+        % which usually represents midnight at the end of the last day is considered 
+        % as the following day by MATLAB, which may be a different day type (weekend/weekday).
         
         if kwargs.hourlyStats
-          [~, tshObj.hourOfVal] = TimestampedStatHolder.findSameHourGroups(timeVec);           
+          [~, tshObj.hourOfVal] = TimestampedStatHolder.findSameHourGroups(timeVec);
           if areWeekdaysInData
             [tmpMean, tmpStd, tmpH] = TimestampedStatHolder.hourlyWeightedMeanStd(timeVec(wd), values(wd, :), kwargs.weights(wd));
             tshObj.valMean(tshObj.hourOfVal == tmpH,:,SLICE_ID_WEEKDAYS) = tmpMean;

@@ -50,20 +50,18 @@ Output.AlgorithmType = AlgorithmType.Benchmark;
 Output.AlgorithmParameters{1} = [];
 
 %% Run Algorithm
+DATES_OF_DATA = (datetime(2004,1,15):datetime(2004,12,31)).';
+isWeekend = weekday(DATES_OF_DATA) == 7 | weekday(DATES_OF_DATA) == 1;
+
 fuelPrice = PRICE_kg_f(iP);
 heatTariff = HEAT_TARIFF(iP);
 
 for iW = 1:NWI
     d = demands_true(iW);  % _true == non-averaged 
-    % Since here we are using averaging windows that are 1 day long, either weekday or
-    % weekend data will be NaN depending on the day in question. Therefore, we must select
-    % the correct slice from the fields of d:
-    dataSlice = ~isnan(d.valMean(1,1,:));
-    
-    mElec = 1e3*d.valMean(:,1, dataSlice); %1e3* - conversion from kWh to W.
-    mHeat = 1e3*d.valMean(:,2, dataSlice);
-    sElec = 0*d.valStd(:,1, dataSlice); %should be zero anyhow.
-    sHeat = 0*d.valStd(:,2, dataSlice); %should be zero anyhow.
+    mElec = 1e3*d.valMean(:,1, 1+isWeekend(iW)); %1e3* - conversion from kWh to W.
+    mHeat = 1e3*d.valMean(:,2, 1+isWeekend(iW));
+    sElec = 0*d.valStd(:,1, 1+isWeekend(iW)); % should be zero anyhow.
+    sHeat = 0*d.valStd(:,2, 1+isWeekend(iW)); % should be zero anyhow.
     
     decided_costs = assignCostsInternal(...
         sol_select, stateFromMap, stateToMap, nTotalNodes, ...
