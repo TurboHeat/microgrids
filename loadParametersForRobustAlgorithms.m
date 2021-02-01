@@ -83,7 +83,7 @@ for b = 1:nBuildings
   chp = CHP_averaged(b);
   for d = 1:NUM_WINDOWS
     do = chp.next();
-    elecTariffs{b,d} = getSeasonalElectricityTariff(b, do.timeEnd);
+    elecTariffs{b,d} = getSeasonalElectricityTariff(buildings(b), do.timeEnd);
   end
   % Rewind the object
   chp.fastForward(chp.timestamps(1), 'first');  
