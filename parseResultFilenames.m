@@ -29,8 +29,7 @@ arguments
   resFormatSpec (1,1) string = "I%04u_AT%02d_AP%03u_B%1u_F%1u_PSF%4f.mat";
 end
 % List files
-files = dir(resPath);
-files = struct2table(files(~[files.isdir]));
+files = struct2table(dir(fullfile(resPath, 'I*.mat')));
 
 % Turn the list into a table
 parsed = [files(:,1), array2table(cell2mat(...
