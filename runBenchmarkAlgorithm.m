@@ -15,6 +15,9 @@ arguments
   kwargs.transitionPenalty (1,1) double = 0.01;
   kwargs.powerScalingFactor (1,1) double = NaN;
 end
+% Constants
+ABSOLUTE_CERTAINTY_ALPHA = 0;
+
 % Unpack kwargs:
 transitionPenalty = kwargs.transitionPenalty;
 iP = kwargs.PriceIndex;
@@ -50,22 +53,28 @@ Output.AlgorithmType = AlgorithmType.Benchmark;
 Output.AlgorithmParameters{1} = [];
 
 %% Run Algorithm
-DATES_OF_DATA = (datetime(2004,1,15):datetime(2004,12,31)).';
-isWeekend = weekday(DATES_OF_DATA) == 7 | weekday(DATES_OF_DATA) == 1;
+START_DATE = datetime(2004,1,15); END_DATE = dateshift(START_DATE, 'end', 'year');
+DATA_DATES = (START_DATE:END_DATE).';
+isWeekend = weekday(DATA_DATES) == 7 | weekday(DATA_DATES) == 1;
 
 fuelPrice = PRICE_kg_f(iP);
 heatTariff = HEAT_TARIFF(iP);
 
 for iW = 1:NWI
     d = demands_true(iW);  % _true == non-averaged 
+    % <Skipped in the benchmark case because the demand is known exactly at all times.>
+    % d = demands_estimate(iW);
+    % ...
+    
+    %% Computation using the true demand
     mElec = 1e3*d.valMean(:,1, 1+isWeekend(iW)); %1e3* - conversion from kWh to W.
     mHeat = 1e3*d.valMean(:,2, 1+isWeekend(iW));
-    sElec = 0*d.valStd(:,1, 1+isWeekend(iW)); % should be zero anyhow.
-    sHeat = 0*d.valStd(:,2, 1+isWeekend(iW)); % should be zero anyhow.
+    sElec = 1e3*d.valStd(:,1, 1+isWeekend(iW)); % should be zero anyhow.
+    sHeat = 1e3*d.valStd(:,2, 1+isWeekend(iW)); % should be zero anyhow.
     
     decided_costs = assignCostsInternal(...
         sol_select, stateFromMap, stateToMap, nTotalNodes, ...
-        mElec, sElec, mHeat, sHeat, 0, ...
+        mElec, zeros(size(sElec)), mHeat, zeros(size(sHeat)), ABSOLUTE_CERTAINTY_ALPHA, ...
         elecTariffs(iW), heatTariff, fuelPrice,...
         POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
         transitionPenaltyFlag, transitionPenalty, ...
@@ -84,7 +93,7 @@ for iW = 1:NWI
     %We run this again to avoid transition penalty.
     true_cost = sum(assignCostsInternal(...
         sol_select(path_edge), stateFromMap(path_edge), stateToMap(path_edge), NODES_CONNECTED_TO_ARTIFICIAL_START, ...
-        mElec, sElec, mHeat, sHeat, 0, ...
+        mElec, zeros(size(sElec)), mHeat, zeros(size(sHeat)), ABSOLUTE_CERTAINTY_ALPHA, ...
         elecTariffs(iW), heatTariff, fuelPrice,...
         POWER_MAP, HEAT_MAP, FUEL_MAP, MDOT_FUEL_SU, ...
         transitionPenaltyFlag(path_edge), transitionPenalty, ...

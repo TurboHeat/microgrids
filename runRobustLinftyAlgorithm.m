@@ -71,13 +71,15 @@ AlgorithmParameters.alpha = a;
 Output.AlgorithmParameters{1} = AlgorithmParameters;
 
 %% Run Algorithm
-DATES_OF_DATA = (datetime(2004,1,15):datetime(2004,12,31)).';
-isWeekend = weekday(DATES_OF_DATA) == 7 | weekday(DATES_OF_DATA) == 1;
+START_DATE = datetime(2004,1,15); END_DATE = dateshift(START_DATE, 'end', 'year');
+DATA_DATES = (START_DATE:END_DATE).';
+isWeekend = weekday(DATA_DATES) == 7 | weekday(DATA_DATES) == 1;
 
 fuelPrice = PRICE_kg_f(iP);
 heatTariff = HEAT_TARIFF(iP);
 
 for iW = 1:NWI
+    %% Computation with forecast demand
     d = demands_estimate(iW);
     mElec = 1e3*d.valMean(:,1, 1+isWeekend(iW)); %1e3* - conversion from kWh to W.
     mHeat = 1e3*d.valMean(:,2, 1+isWeekend(iW));
