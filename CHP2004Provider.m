@@ -187,10 +187,8 @@ classdef CHP2004Provider < ConsumptionDataProvider
         newMaxPowerDemand (1,1) double {mustBeNonempty, mustBeReal} % new maximum value in [kW]
       end
       if cdpObj.currentWindowPosition ~= 1
-        % Only allow if the object is rewinded. This is a failsafe to ensure that the user
-        % doesn't change the scaling in the middle of a computation. 
-        throw(MException('CHP2004Provider:rescaleUnrewindedObject',...
-          'Please rewind/fast-forward the object to the first time step before changing the scaling!'));
+        % Warn the user about changing the scaling in the middle of a computation (i.e. after .next() was called at least once already). 
+        warning('CHP2004Provider:rescaleUnrewindedObject', 'Rescaling applied to an unrewinded object!');
       end
       if ~isnan(newMaxPowerDemand)        
         oldPowerScale = max(cdpObj.data(:,1));
