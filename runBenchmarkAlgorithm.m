@@ -55,18 +55,20 @@ Output.AlgorithmParameters{1} = [];
 %% Run Algorithm
 START_DATE = datetime(2004,1,15); END_DATE = dateshift(START_DATE, 'end', 'year');
 DATA_DATES = (START_DATE:END_DATE).';
+CURRENT_DAY_OFFSET = +1;
 isWeekend = weekday(DATA_DATES) == 7 | weekday(DATA_DATES) == 1;
 
 fuelPrice = PRICE_kg_f(iP);
 heatTariff = HEAT_TARIFF(iP);
 
 for iW = 1:NWI
-    d = demands_true(iW);  % _true == non-averaged 
+    %% Computation using the forecast demand
     % <Skipped in the benchmark case because the demand is known exactly at all times.>
     % d = demands_estimate(iW);
     % ...
     
     %% Computation using the true demand
+    d = demands_true(iW + CURRENT_DAY_OFFSET);  % _true == non-averaged
     mElec = 1e3*d.valMean(:,1, 1+isWeekend(iW)); %1e3* - conversion from kWh to W.
     mHeat = 1e3*d.valMean(:,2, 1+isWeekend(iW));
     sElec = 1e3*d.valStd(:,1, 1+isWeekend(iW)); % should be zero anyhow.
