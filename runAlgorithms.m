@@ -30,17 +30,8 @@ runRobustLinfty = 1;
 LinftyAlphas = [0.01:0.01:0.05, 0.1:0.05:0.7];
 
 runRobustMixed = 1;
-mixedAlphas = repmat([0.01:0.01:0.05,0.07,0.1,0.13,0.15,0.17,0.2],[1,10]);
-mixedSpikeAlphas = [.5*sqrt(5760)*ones(1,11),...
-  1*sqrt(5760)*ones(1,11),...
-  1.5*sqrt(5760)*ones(1,11),...
-  2*sqrt(5760)*ones(1,11),...
-  2.5*sqrt(5760)*ones(1,11),...
-  3*sqrt(5760)*ones(1,11),...
-  3.5*sqrt(5760)*ones(1,11),...
-  4*sqrt(5760)*ones(1,11),...
-  1*5760*ones(1,11),...
-  2*5760*ones(1,11)];
+mixedAlphas = repmat(0:0.005:0.02,[1,5]);
+mixedSpikeAlphas = [1*ones(1,5),5*ones(1,5),20*ones(1,5),40*ones(1,5),100*ones(1,5)];
 
 %% Choose Prices and Building Combinations
 %i-th scenario has building type BuildingTypes(i) and the index of the gas
@@ -133,7 +124,7 @@ for idx = 1:numel(iter_ids)
   iter = iter_ids(idx);
   % Unpack scenario configurations:
   jScenario = scenarios(iter);
-    algType = algorithmType(iter);
+  algType = algorithmType(iter);
   algParam = algorithmParameters(iter);
 
   building = BUILDINGS_TO_TEST(buildingTypes(jScenario));
@@ -149,7 +140,7 @@ for idx = 1:numel(iter_ids)
       % Create an empty file (so that other workers will skip it):
       emptyFile(fPath); % In most cases, does nothing in parfor.
     end
-    
+
     % Perform the computation
     tv = tic();
     switch algType
@@ -173,7 +164,7 @@ for idx = 1:numel(iter_ids)
           'alphaSpikes', mixedSpikeAlphas(algParam),...
           'powerScalingFactor', psf);
     end
-    
+
     parsave(fPath, out, iter, algType, algParam, building, priceInd, psf);
     %{
     outputData(iter).Data = out;
