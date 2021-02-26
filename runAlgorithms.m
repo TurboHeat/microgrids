@@ -56,11 +56,12 @@ nFuelPrices = numel(NATURAL_GAS_PARAMS());
 %% Reporting on the current run:
 if nargin > 0 && ~isempty(fuelIdx)
   tsdisp("Only fuelIdx = " + mat2str(fuelIdx) + " will be considered!")
-  keepIdx = priceIndices == fuelIdx;
+  keepIdx = any(priceIndices(:) == fuelIdx(:).', 2);
   priceIndices = priceIndices(keepIdx);
   buildingTypes = buildingTypes(keepIdx);
 else
   tsdisp("All " + nFuelPrices + " fuelIdx will be considered!")
+  fuelIdx = 1:4;
 end
 
 %% Assert and initilize variables
@@ -125,15 +126,18 @@ else
   ppm = ParforProgressbar(numel(iter_ids));
 end
 
-    iter = iter_ids(idx);
-    % Unpack scenario configurations:
-    jScenario = scenarios(iter);
+% NOTE: the outer loop should only be "for" when there is a single iteration id 
+% and multiple fuel prices (e.g. when running the benchmark locally), otherwise 
+% it's best to switch the for/parfor.
+for idx = 1:numel(iter_ids)
+  iter = iter_ids(idx);
+  % Unpack scenario configurations:
+  jScenario = scenarios(iter);
     algType = algorithmType(iter);
-    algParam = algorithmParameters(iter);
+  algParam = algorithmParameters(iter);
 
-    building = BUILDINGS_TO_TEST(buildingTypes(jScenario));
-    priceInd = priceIndices(jScenario);
-    
+  building = BUILDINGS_TO_TEST(buildingTypes(jScenario));
+  for priceInd = fuelIdx
     % Determine if we need to compute the current file:
     fName = makeFilename(iter, algType, algParam, building, priceInd, psf);
     fPath = fullfile(OUTPUT_FOLDER, fName);
