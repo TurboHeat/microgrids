@@ -79,10 +79,8 @@ numRobustMixed = numel(mixedAlphas);
 % algorithm-scenario pairs.
 scenarioList = 1:numScenarios;
 algorithmList = 1:(1*runBenchmark + 1*runNominal + numRobustLinfty*runRobustLinfty + numRobustMixed *runRobustMixed);
-numAlgorithms = numel(algorithmList);
 
 [scenarios, algorithms] = meshgrid(scenarioList, algorithmList);
-numPairs = numel(scenarios);
 scenarios = scenarios(:);
 algorithms = algorithms(:);
 
@@ -96,19 +94,6 @@ algorithmType = algorithmTypeKey(algorithms);
 algorithmParameterKey = [1:runBenchmark,1:runNominal,1:numRobustLinfty*runRobustLinfty,1:numRobustMixed *runRobustMixed]';
 algorithmParameters = algorithmParameterKey(algorithms);
 
-% Prepare structure for output data
-%{
-outputData(numPairs).Data.Power_Generation = [];
-outputData(numPairs).Data.Heat_Generation = [];
-outputData(numPairs).Data.Fuel_Consumption = [];
-outputData(numPairs).Data.EstimatedCost = [];
-outputData(numPairs).Data.TrueCost = [];
-outputData(numPairs).Data.AlgorithmType = [];
-outputData(numPairs).Data.AlgorithmParameters{1} = [];
-
-outputData(numPairs).BuildingType = 0;
-outputData(numPairs).PriceIndex = 0;
-%}
 %% Run Algorithms on Scenarios
 % Initialize parallel pool:
 ts = datetime('now');
@@ -130,14 +115,19 @@ spmd % Issue commands to all workers in pool (Single Program, Multiple Data)
 end
 
 nSc = numel(scenarios);
-iter_ids = RUN_BANK(max(1, minId):min(nSc, maxId));
-if batchStartupOptionUsed()
-  % In case of batch execution (running on a cluster)
-  parfor idx = 1:numel(iter_ids)
+% iter_ids = RUN_BANK(max(1, minId):min(nSc, maxId));
+iter_ids = max(1, minId):min(nSc, maxId);
+bso = batchStartupOptionUsed();
+% In case of batch execution (running on a cluster) we don't want a progressbar:
+if bso
+  ppm = []; % we have to create the variable or the parfor complains
+else  
+  ppm = ParforProgressbar(numel(iter_ids));
+end
+
     iter = iter_ids(idx);
     % Unpack scenario configurations:
     jScenario = scenarios(iter);
-    iAlgorithm = algorithms(iter);
     algType = algorithmType(iter);
     algParam = algorithmParameters(iter);
 
@@ -187,64 +177,11 @@ if batchStartupOptionUsed()
     outputData(iter).PriceIndex = priceInd;
     %}
     tsdisp("Iteration #" + iter + " took " + round(toc(tv)) + "sec.");
+    if ~bso, ppm.increment(); end %#ok<PFBNS> 
   end
-else  
-  ppm = ParforProgressbar(nSc);
-  parfor iter = 1:nSc
-    % Unpack scenario configurations:
-    jScenario = scenarios(iter);
-    iAlgorithm = algorithms(iter);
-    algType = algorithmType(iter);
-    algParam = algorithmParameters(iter);
-
-    building = BUILDINGS_TO_TEST(buildingTypes(jScenario));
-    priceInd = priceIndices(jScenario);
-    
-    % Determine if we need to compute the current file:
-    fName = makeFilename(iter, algType, algParam, building, priceInd);
-    fPath = fullfile(OUTPUT_FOLDER, fName);
-    if isfile(fPath)
-      tsdisp(fName + " already exists - skipping.");
-      continue
-    else
-      tsdisp("Starting work on: " + fName);
-    end
-    
-    % Perform the computation
-    tv = tic();
-    switch algType
-      case -1
-        out = runBenchmarkAlgorithm('PriceIndex',priceInd,...
-          'BuildingType', building,...
-          'powerScalingFactor', psf);
-      case 0
-        out = runNominalAlgorithm('PriceIndex',priceInd,...
-          'BuildingType', building,...
-          'powerScalingFactor', psf);
-      case 1
-        out = runRobustLinftyAlgorithm('PriceIndex',priceInd,...
-          'BuildingType', building,...
-          'alpha', LinftyAlphas(algParam),...
-          'powerScalingFactor', psf);
-      case 2
-        out = runRobustMixedAlgorithm('PriceIndex',priceInd,...
-          'BuildingType',building,...
-          'alphaMixed', mixedAlphas(algParam),...
-          'alphaSpikes', mixedSpikeAlphas(algParam),...
-          'powerScalingFactor', psf);
-    end
-    fName = makeFilename(iter, algType, algParam, building, priceInd);
-    parsave(fullfile(OUTPUT_FOLDER, fName), out, iter, algType, algParam, building, priceInd);
-    %{
-    outputData(iter).Data = out;
-    outputData(iter).BuildingType = building;  
-    outputData(iter).PriceIndex = priceInd;
-    %}
-    disp("Iteration #" + iter + " took " + toc(tv));
-    ppm.increment(); %#ok<PFBNS>
-  end
-  delete(ppm);  
 end
+if ~bso, delete(ppm); end
+
 end
 
 function emptyFile(fPath)
