@@ -1,0 +1,38 @@
+This document how to run the Microgrids (aka "MGT") simulation code on an Altair PBS cluster.
+
+1. Introduction
+	For each server, there are two "main" scripts that should be run by the user:
+	- <server name>_loop_1p.sh - for "1 processor", i.e. no parpool.
+	- <server name>_loop_mp.sh - for "multiple processors", i.e. with parpool.
+
+	Each of the above scripts has a "secondary" script which it calls, with the name "run_sim_<server initial>_<#>p.sh". 
+	The secondary scripts actually queue the execution of the respective MATLAB functions (runAlgorithms_1p.m, runAlgorithms.m).
+	Several versions of the MATLAB functions can be found in the GitHub repository: https://github.com/TurboHeat/microgrids
+		(as of the time of writing, on the `develop` branch).
+
+2. Execution
+	The main scripts *should* be edited as necessary before each run, to ensure only the relevant cases are being computed.
+	It is up to the user to set the correct # of CPUs (at the top of the main file), otherwise the cluster might terminate the job prematurely.
+	In the case of Zeus, the submission queue can also be set in the main script.
+
+	The secondary scripts *may need to* be edited to change some hard-coded configurations (e.g., MATLAB function signatures), but SHOULD NOT BE INVOKED DIRECTLY.
+
+	Below are the commands to execute in the terminal to start the simulations for the server "zeus":
+
+		bash zeus_loop_1p.sh
+		bash zeus_loop_mp.sh
+		
+	When submitting a job to Zeus, it might be necessary to change the queue. For Technion users there are two relevant options:
+	"zeus_all_q" and "zeus_long_q", for 24h and 72h computation windows, respectively.
+
+	For more information see:
+	https://cis.technion.ac.il/en/central-services/high-performance-computing-hpc/hpc-cluster/	
+
+3. Monitoring
+	After submitting the jobs, here are several locations to monitor:
+	1)	The working directory (where this file is found), for files looking like "<Job Name>.[eo]<Job ID>" (where .e is stderr, and .o is stdout). 
+		If these files exist, it indicates that the job finished or stopped. 
+		A successful job typically has an .o file of size 84 and an .e file of size 0.
+	2)	The "cluster_jobs" folder at /home/<username>/.matlab/local_cluster_jobs/R202##. 
+		Here it's important to see that a new Job folder + 4 files are created, about 20sec after submitting a job.
+	3)	The /logs folder, for timestamped outputs of the MATLAB scripts.
