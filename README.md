@@ -1,10 +1,27 @@
-# Optimization of the operations of a cogeneration unit in a unit commitment problem against the utility
+# Economic dispatch of a single micro gas turbine under CHP operation with uncertain demands
+
+This contains the source code for the article in the title, found in https://doi.org/10.1016/j.apenergy.2021.118391
+
+```tex
+@article{Sharf_2022,
+	title        = {Economic dispatch of a single micro gas turbine under {CHP} operation with uncertain demands},
+	author       = {Miel Sharf and Iliya Romm and Michael Palman and Daniel Zelazo and Beni Cukurel},
+	year         = 2022,
+	month        = {mar},
+	journal      = {Applied Energy},
+	publisher    = {Elsevier {BV}},
+	volume       = 309,
+	pages        = 118391,
+	doi          = {10.1016/j.apenergy.2021.118391},
+	url          = {https://doi.org/10.1016%2Fj.apenergy.2021.118391}
+}
+```
+
+**Contributors (in chronological order): Johannes F. Rist, Miguel de Freitas Dias, Iliya Romm, Anoop Jain, Miel Sharf.**
 
 See also:
 
 > Johannes F. Rist, et al. "_Economic dispatch of a single micro-gas turbine under CHP operation._" Applied Energy 200 (2017): 1-18. [DOI](https://doi.org/10.1016/j.apenergy.2017.05.064)
-
-**Contributors (in chronological order): Johannes F. Rist, Miguel de Freitas Dias, Iliya Romm, Anoop Jain, Miel Sharf.**
 
 ---
 
